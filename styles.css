@@ -1,0 +1,142 @@
+/* Fonte e fundo geral */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    max-width: 620px;
+    margin: 30px auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #f0f4ff, #d9e4ff);
+    color: #222;
+}
+
+/* Título principal */
+h1 {
+    text-align: center;
+    color: #2a57a9;
+    margin-bottom: 30px;
+    text-shadow: 1px 1px 3px rgba(74, 144, 226, 0.5);
+}
+
+/* Estilo dos fieldsets */
+fieldset {
+    margin-bottom: 30px;
+    padding: 25px 30px;
+    border: 2px solid #4a90e2;
+    border-radius: 12px;
+    background-color: #ffffffdd;
+    /* branco semi-transparente */
+    box-shadow: 0 6px 15px rgba(74, 144, 226, 0.3);
+}
+
+/* Legendas dos fieldsets */
+legend {
+    font-weight: 700;
+    font-size: 1.3rem;
+    padding: 0 20px;
+    color: #2a57a9;
+    text-shadow: 1px 1px 3px rgba(74, 144, 226, 0.4);
+}
+
+/* Container linha input+label */
+.jogo-group {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 15px;
+    margin-bottom: 15px;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Labels alinhados, largura fixa e com cor */
+.jogo-group label {
+    flex: 0 0 160px;
+    color: #3b4ca6;
+    font-weight: 600;
+    text-align: right;
+    user-select: none;
+}
+
+/* Inputs com largura fixa e estilo */
+.jogo-group input[type="number"] {
+    flex: 0 0 90px;
+    padding: 9px 12px;
+    border: 2px solid #4a90e2;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Focus no input */
+.jogo-group input[type="number"]:focus {
+    border-color: #2a57a9;
+    outline: none;
+    box-shadow: 0 0 10px #2a57a9bb;
+}
+
+/* Container dos botões */
+.botoes-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    max-width: 340px;
+    margin: 0 auto 25px auto;
+}
+
+/* Botões com largura total do container, cores e sombras */
+.botoes-container button {
+    width: 100%;
+    padding: 15px 0;
+    font-size: 18px;
+    cursor: pointer;
+    border: none;
+    border-radius: 12px;
+    background: #4a90e2;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 7px 15px rgba(74, 144, 226, 0.6);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Hover dos botões */
+.botoes-container button:hover {
+    background-color: #2a57a9;
+    box-shadow: 0 9px 20px rgba(42, 87, 169, 0.8);
+}
+
+/* Resultado da análise */
+#resultado {
+    margin-top: 30px;
+    font-weight: 700;
+    font-size: 20px;
+    color: #124d00;
+    background: #d6f5d6;
+    padding: 20px 25px;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(18, 77, 0, 0.3);
+    white-space: pre-line;
+    user-select: text;
+    text-align: center;
+}
+
+/* Responsividade simples para telas menores */
+@media (max-width: 480px) {
+    body {
+        padding: 15px 10px;
+        max-width: 95%;
+    }
+
+    .jogo-group label {
+        flex: 1 0 120px;
+        font-size: 0.9rem;
+    }
+
+    .jogo-group input[type="number"] {
+        flex: 0 0 70px;
+        font-size: 0.9rem;
+        padding: 7px 8px;
+    }
+
+    .botoes-container {
+        max-width: 100%;
+    }
+}

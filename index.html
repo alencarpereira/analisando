@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Análise BTTS com Médias Automáticas</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <h1>Análise Ambos os Times Marcam (BTTS)</h1>
+
+    <form id="btForm">
+
+        <fieldset>
+            <legend>Últimos 5 Confrontos Diretos</legend>
+            <div class="jogo-group">
+                <label>Jogo 1 - Gols Time A:</label>
+                <input type="number" class="cd_gols_timeA" min="0" required />
+                <label>Jogo 1 - Gols Time B:</label>
+                <input type="number" class="cd_gols_timeB" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 2 - Gols Time A:</label>
+                <input type="number" class="cd_gols_timeA" min="0" required />
+                <label>Jogo 2 - Gols Time B:</label>
+                <input type="number" class="cd_gols_timeB" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 3 - Gols Time A:</label>
+                <input type="number" class="cd_gols_timeA" min="0" required />
+                <label>Jogo 3 - Gols Time B:</label>
+                <input type="number" class="cd_gols_timeB" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 4 - Gols Time A:</label>
+                <input type="number" class="cd_gols_timeA" min="0" required />
+                <label>Jogo 4 - Gols Time B:</label>
+                <input type="number" class="cd_gols_timeB" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 5 - Gols Time A:</label>
+                <input type="number" class="cd_gols_timeA" min="0" required />
+                <label>Jogo 5 - Gols Time B:</label>
+                <input type="number" class="cd_gols_timeB" min="0" required />
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Dados Time A (últimos 5 jogos)</legend>
+            <div class="jogo-group">
+                <label>Jogo 1 - Gols Marcados:</label>
+                <input type="number" class="timeA_gols_marcados" min="0" required />
+                <label>Jogo 1 - Gols Sofridos:</label>
+                <input type="number" class="timeA_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 2 - Gols Marcados:</label>
+                <input type="number" class="timeA_gols_marcados" min="0" required />
+                <label>Jogo 2 - Gols Sofridos:</label>
+                <input type="number" class="timeA_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 3 - Gols Marcados:</label>
+                <input type="number" class="timeA_gols_marcados" min="0" required />
+                <label>Jogo 3 - Gols Sofridos:</label>
+                <input type="number" class="timeA_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 4 - Gols Marcados:</label>
+                <input type="number" class="timeA_gols_marcados" min="0" required />
+                <label>Jogo 4 - Gols Sofridos:</label>
+                <input type="number" class="timeA_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 5 - Gols Marcados:</label>
+                <input type="number" class="timeA_gols_marcados" min="0" required />
+                <label>Jogo 5 - Gols Sofridos:</label>
+                <input type="number" class="timeA_gols_sofridos" min="0" required />
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Dados Time B (últimos 5 jogos)</legend>
+            <div class="jogo-group">
+                <label>Jogo 1 - Gols Marcados:</label>
+                <input type="number" class="timeB_gols_marcados" min="0" required />
+                <label>Jogo 1 - Gols Sofridos:</label>
+                <input type="number" class="timeB_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 2 - Gols Marcados:</label>
+                <input type="number" class="timeB_gols_marcados" min="0" required />
+                <label>Jogo 2 - Gols Sofridos:</label>
+                <input type="number" class="timeB_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 3 - Gols Marcados:</label>
+                <input type="number" class="timeB_gols_marcados" min="0" required />
+                <label>Jogo 3 - Gols Sofridos:</label>
+                <input type="number" class="timeB_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 4 - Gols Marcados:</label>
+                <input type="number" class="timeB_gols_marcados" min="0" required />
+                <label>Jogo 4 - Gols Sofridos:</label>
+                <input type="number" class="timeB_gols_sofridos" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Jogo 5 - Gols Marcados:</label>
+                <input type="number" class="timeB_gols_marcados" min="0" required />
+                <label>Jogo 5 - Gols Sofridos:</label>
+                <input type="number" class="timeB_gols_sofridos" min="0" required />
+            </div>
+        </fieldset>
+
+        <div class="botoes-container">
+            <button id="btnPreencher" type="button">Preencher Automaticamente</button>
+            <button id="btnLimpar" type="button">Limpar</button>
+            <button type="submit">Calcular Probabilidade BTTS</button>
+        </div>
+
+    </form>
+
+    <div id="resultado"></div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
