@@ -44,8 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const probTotal = (probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos);
 
-        // Ajuste no maxValorEsperado para normalização
-        const maxValorEsperado = 4;  // Alterado de 10 para 4
+        const maxValorEsperado = 4;
         let probBTTS = (probTotal / maxValorEsperado) * 100;
         if (probBTTS > 100) probBTTS = 100;
         if (probBTTS < 0) probBTTS = 0;
@@ -77,7 +76,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const totalJogos = golsMarcadosA.length;
 
-        // Médias e frequências
         const mediaGolsMarcadosA = calcularMedia(golsMarcadosA);
         const mediaGolsSofridosA = calcularMedia(golsSofridosA);
         const mediaGolsMarcadosB = calcularMedia(golsMarcadosB);
@@ -101,17 +99,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const pontuacaoB = freqResultadosB.v + freqResultadosB.e * 0.5;
         const ajusteResultados = (pontuacaoA + pontuacaoB) / (2 * totalJogos);
 
-        // Média combinada gols confronto direto
         const mediaConfrontoGols = mediaCDGolsA + mediaCDGolsB;
 
-        // Construindo a sugestão simples
+        // Estimativa de placar provável
+        const estimativaGolsA = ((mediaGolsMarcadosA + mediaGolsSofridosB) / 2).toFixed(1);
+        const estimativaGolsB = ((mediaGolsMarcadosB + mediaGolsSofridosA) / 2).toFixed(1);
+        const placarProvavel = `🔮 Placar provável estimado: Time A ${estimativaGolsA} x ${estimativaGolsB} Time B\n\n`;
+
         let sugestaoBTTS = "";
         if (probBTTS >= 60) sugestaoBTTS = "Boa chance de ambos os times marcarem (BTTS).";
         else if (probBTTS >= 40) sugestaoBTTS = "Probabilidade moderada para BTTS.";
         else sugestaoBTTS = "Baixa chance de ambos os times marcarem.";
 
-        // Montando texto completo com explicações
         resultadoDiv.textContent =
+            placarProvavel +
             `Probabilidade aproximada de "Ambos os Times Marcam (BTTS)": ${probBTTS.toFixed(2)}%\n` +
             `Probabilidade aproximada de "Ambos os Times NÃO Marcam": ${probNaoBTTS.toFixed(2)}%\n\n` +
 
@@ -151,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         preencherClasse('cd_gols_timeA', [2, 3, 1, 2, 2]);
         preencherClasse('cd_gols_timeB', [2, 2, 1, 1, 3]);
 
-
         resultadoDiv.textContent = '';
     });
 
@@ -171,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         resultadoDiv.textContent = '';
     });
 });
-
 
 
 
