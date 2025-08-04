@@ -106,6 +106,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const estimativaGolsB = ((mediaGolsMarcadosB + mediaGolsSofridosA) / 2).toFixed(1);
         const placarProvavel = `🔮 Placar provável estimado: Time A ${estimativaGolsA} x ${estimativaGolsB} Time B\n\n`;
 
+        // Cálculo simplificado probabilidade over/under +2.5 gols
+        const mediaTotalGols = mediaGolsMarcadosA + mediaGolsSofridosA + mediaGolsMarcadosB + mediaGolsSofridosB;
+        let probMais2_5 = 0;
+        if (mediaTotalGols >= 3.0) probMais2_5 = 80;
+        else if (mediaTotalGols >= 2.5) probMais2_5 = 60;
+        else if (mediaTotalGols >= 2.0) probMais2_5 = 40;
+        else probMais2_5 = 20;
+        const probMenos2_5 = 100 - probMais2_5;
+
         let sugestaoBTTS = "";
         if (probBTTS >= 60) sugestaoBTTS = "Boa chance de ambos os times marcarem (BTTS).";
         else if (probBTTS >= 40) sugestaoBTTS = "Probabilidade moderada para BTTS.";
@@ -115,6 +124,10 @@ document.addEventListener('DOMContentLoaded', () => {
             placarProvavel +
             `Probabilidade aproximada de "Ambos os Times Marcam (BTTS)": ${probBTTS.toFixed(2)}%\n` +
             `Probabilidade aproximada de "Ambos os Times NÃO Marcam": ${probNaoBTTS.toFixed(2)}%\n\n` +
+
+            `Probabilidade aproximada de Over/Under +2.5 Gols:\n` +
+            `- Mais de 2.5 gols: ${probMais2_5}%\n` +
+            `- Menos de 2.5 gols: ${probMenos2_5}%\n\n` +
 
             `Resumo Ofensivo e Defensivo:\n` +
             `- Time A: Média gols marcados ${mediaGolsMarcadosA.toFixed(2)}, gols sofridos ${mediaGolsSofridosA.toFixed(2)}\n` +
@@ -131,7 +144,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             `Sugestão:\n${sugestaoBTTS}`;
     });
-
 
     const btnPreencher = document.getElementById('btnPreencher');
     const btnLimpar = document.getElementById('btnLimpar');
@@ -171,6 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultadoDiv.textContent = '';
     });
 });
+
 
 
 
