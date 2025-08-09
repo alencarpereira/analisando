@@ -136,16 +136,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Função para gerar sugestão simples baseada na maior probabilidade
         function gerarSugestaoDuplaChance() {
-            const probabilidades = [
-                { tipo: 'Time A ou Empate', valor: probTimeAouEmpate },
-                { tipo: 'Time B ou Empate', valor: probTimeBouEmpate },
-                { tipo: 'Time A ou Time B (qualquer um vence)', valor: probTimeAouTimeB },
+            // Calcula score combinando probabilidade e pontuação ponderada
+            const scoreTimeAouEmpate = probTimeAouEmpate + pontuacaoPonderadaA;
+            const scoreTimeBouEmpate = probTimeBouEmpate + pontuacaoPonderadaB;
+            const scoreTimeAouTimeB = probTimeAouTimeB + ((pontuacaoPonderadaA + pontuacaoPonderadaB) / 2);
+
+            // Monta array para ordenar pelo score
+            const opcoes = [
+                { tipo: 'Time A ou Empate', valor: probTimeAouEmpate, score: scoreTimeAouEmpate },
+                { tipo: 'Time B ou Empate', valor: probTimeBouEmpate, score: scoreTimeBouEmpate },
+                { tipo: 'Time A ou Time B (qualquer um vence)', valor: probTimeAouTimeB, score: scoreTimeAouTimeB },
             ];
 
-            probabilidades.sort((a, b) => b.valor - a.valor);
-            const melhor = probabilidades[0];
-            return `Sugestão de aposta Dupla Chance: **${melhor.tipo}** com probabilidade de ${melhor.valor.toFixed(1)}%`;
+            // Ordena do maior para menor score
+            opcoes.sort((a, b) => b.score - a.score);
+
+            // Regra de desempate para probabilidades muito próximas (diferença menor que 2%)
+            const diff12 = Math.abs(opcoes[0].valor - opcoes[1].valor);
+            if (diff12 < 2) {
+                // Se próximos, escolhe o que tem maior pontuação ponderada (score já considera isso)
+                // Aqui pode fazer ajustes adicionais se quiser (exemplo: checar quem tem mais vitórias)
+                // Para simplificar, já está ordenado pelo score, então só retorna o primeiro
+                return `Sugestão de aposta Dupla Chance: **${opcoes[0].tipo}** com probabilidade de ${opcoes[0].valor.toFixed(1)}% (desempate por performance)`;
+            }
+
+            // Caso normal, retorna a opção de maior score
+            return `Sugestão de aposta Dupla Chance: **${opcoes[0].tipo}** com probabilidade de ${opcoes[0].valor.toFixed(1)}%`;
         }
+
 
         // Probabilidade BTTS
         const probBTTS = calcularProbBTTS(golsMarcadosA, golsSofridosA, golsMarcadosB, golsSofridosB, cdGolsTimeA, cdGolsTimeB);
