@@ -154,16 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Regra de desempate para probabilidades muito próximas (diferença menor que 2%)
             const diff12 = Math.abs(opcoes[0].valor - opcoes[1].valor);
             if (diff12 < 2) {
-                // Se próximos, escolhe o que tem maior pontuação ponderada (score já considera isso)
-                // Aqui pode fazer ajustes adicionais se quiser (exemplo: checar quem tem mais vitórias)
-                // Para simplificar, já está ordenado pelo score, então só retorna o primeiro
                 return `Sugestão de aposta Dupla Chance: **${opcoes[0].tipo}** com probabilidade de ${opcoes[0].valor.toFixed(1)}% (desempate por performance)`;
             }
 
-            // Caso normal, retorna a opção de maior score
             return `Sugestão de aposta Dupla Chance: **${opcoes[0].tipo}** com probabilidade de ${opcoes[0].valor.toFixed(1)}%`;
         }
-
 
         // Probabilidade BTTS
         const probBTTS = calcularProbBTTS(golsMarcadosA, golsSofridosA, golsMarcadosB, golsSofridosB, cdGolsTimeA, cdGolsTimeB);
@@ -215,6 +210,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const pontuacaoB = freqResultadosB.v + freqResultadosB.e * 0.5;
         const ajusteResultados = (pontuacaoA + pontuacaoB) / (2 * totalJogos);
 
+        // Sugestão gols baseado na média combinada
+        const mediaCombinada = ((mediaGolsMarcadosA + mediaGolsSofridosA) + (mediaGolsMarcadosB + mediaGolsSofridosB)) / 2;
+
+        let sugestaoGols = "";
+        if (mediaCombinada > 2.5) {
+            sugestaoGols = `Sugestão de Gols (método média combinada): Over 1.5 (Média: ${mediaCombinada.toFixed(2)})\n\n`;
+        } else {
+            sugestaoGols = `Sugestão de Gols (método média combinada): Under 3.5 (Média: ${mediaCombinada.toFixed(2)})\n\n`;
+        }
+
         // Monta texto final
         const textoFinal =
             placarProvavel +
@@ -230,6 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
             `- Time A: Média gols marcados ${mediaGolsMarcadosA.toFixed(2)}, gols sofridos ${mediaGolsSofridosA.toFixed(2)}\n` +
             `- Time B: Média gols marcados ${mediaGolsMarcadosB.toFixed(2)}, gols sofridos ${mediaGolsSofridosB.toFixed(2)}\n\n` +
 
+            sugestaoGols +
+
             `Frequência de Resultados:\n` +
             `- Time A: ${pctVitoriaA.toFixed(1)}% vitórias, ${pctEmpateA.toFixed(1)}% empates, ${pctDerrotaA.toFixed(1)}% derrotas\n` +
             `- Time B: ${pctVitoriaB.toFixed(1)}% vitórias, ${pctEmpateB.toFixed(1)}% empates, ${pctDerrotaB.toFixed(1)}% derrotas\n\n` +
@@ -243,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resultadoDiv.textContent = textoFinal;
     });
+
 
     // Preencher automático com dados exemplo
     btnPreencher.addEventListener('click', () => {
