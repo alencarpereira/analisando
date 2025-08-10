@@ -136,22 +136,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Função para gerar sugestão simples baseada na maior probabilidade
         function gerarSugestaoDuplaChance() {
-            // Calcula score combinando probabilidade e pontuação ponderada
             const scoreTimeAouEmpate = probTimeAouEmpate + pontuacaoPonderadaA;
             const scoreTimeBouEmpate = probTimeBouEmpate + pontuacaoPonderadaB;
             const scoreTimeAouTimeB = probTimeAouTimeB + ((pontuacaoPonderadaA + pontuacaoPonderadaB) / 2);
 
-            // Monta array para ordenar pelo score
             const opcoes = [
                 { tipo: 'Time A ou Empate', valor: probTimeAouEmpate, score: scoreTimeAouEmpate },
                 { tipo: 'Time B ou Empate', valor: probTimeBouEmpate, score: scoreTimeBouEmpate },
                 { tipo: 'Time A ou Time B (qualquer um vence)', valor: probTimeAouTimeB, score: scoreTimeAouTimeB },
             ];
 
-            // Ordena do maior para menor score
             opcoes.sort((a, b) => b.score - a.score);
 
-            // Regra de desempate para probabilidades muito próximas (diferença menor que 2%)
             const diff12 = Math.abs(opcoes[0].valor - opcoes[1].valor);
             if (diff12 < 2) {
                 return `Sugestão de aposta Dupla Chance: **${opcoes[0].tipo}** com probabilidade de ${opcoes[0].valor.toFixed(1)}% (desempate por performance)`;
@@ -185,23 +181,50 @@ document.addEventListener('DOMContentLoaded', () => {
         // Média gols confronto direto
         const mediaConfrontoGols = mediaCDGolsA + mediaCDGolsB;
 
-        // Probabilidade Over 2.5 gols (ponderado)
-        let probMais2_5 = (freqReal * 0.4) + (mediaTotalGols * 10 * 0.3) + (mediaConfrontoGols * 10 * 0.3);
-        if (probMais2_5 > 100) probMais2_5 = 100;
-        if (probMais2_5 < 0) probMais2_5 = 0;
+        // Probabilidade Over 2.5 gols (usando Poisson)
+        function factorial(n) {
+            if (n === 0) return 1;
+            let f = 1;
+            for (let i = 1; i <= n; i++) f *= i;
+            return f;
+        }
 
+        function poisson(k, lambda) {
+            return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+        }
+
+        function probOverX(lambdaA, lambdaB, x) {
+            let prob = 0;
+            const maxGols = 10;
+            for (let golsA = 0; golsA <= maxGols; golsA++) {
+                for (let golsB = 0; golsB <= maxGols; golsB++) {
+                    if ((golsA + golsB) > x) {
+                        prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
+                    }
+                }
+            }
+            return prob * 100;
+        }
+
+        const lambdaA = (mediaGolsMarcadosA + mediaGolsSofridosB) / 2;
+        const lambdaB = (mediaGolsMarcadosB + mediaGolsSofridosA) / 2;
+        const probMais2_5 = probOverX(lambdaA, lambdaB, 2);
         const probMenos2_5 = 100 - probMais2_5;
 
-        // Sugestões baseadas nas probabilidades
+        let sugestaoGols = "";
+        if (probMais2_5 >= 70) {
+            sugestaoGols = `Alta probabilidade de mais de 2.5 gols (${probMais2_5.toFixed(1)}%).\n\n`;
+        } else if (probMais2_5 >= 50) {
+            sugestaoGols = `Chance razoável de mais de 2.5 gols (${probMais2_5.toFixed(1)}%).\n\n`;
+        } else {
+            sugestaoGols = `Jogo com menor probabilidade de mais de 2.5 gols (${probMais2_5.toFixed(1)}%).\n\n`;
+        }
+
+        // Sugestões baseadas nas probabilidades BTTS e Dupla Chance
         let sugestaoBTTS = "";
         if (probBTTS >= 60) sugestaoBTTS = "Boa chance de ambos os times marcarem (BTTS).";
         else if (probBTTS >= 40) sugestaoBTTS = "Probabilidade moderada para BTTS.";
         else sugestaoBTTS = "Baixa chance de ambos os times marcarem.";
-
-        let sugestaoOver25 = "";
-        if (probMais2_5 >= 70) sugestaoOver25 = "Alta probabilidade de mais de 2.5 gols (Over 2.5).";
-        else if (probMais2_5 >= 50) sugestaoOver25 = "Chance razoável de mais de 2.5 gols.";
-        else sugestaoOver25 = "Jogo com tendência a poucos gols (Under 2.5).";
 
         const sugestaoDuplaChance = gerarSugestaoDuplaChance();
 
@@ -209,16 +232,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pontuacaoA = freqResultadosA.v + freqResultadosA.e * 0.5;
         const pontuacaoB = freqResultadosB.v + freqResultadosB.e * 0.5;
         const ajusteResultados = (pontuacaoA + pontuacaoB) / (2 * totalJogos);
-
-        // Sugestão gols baseado na média combinada
-        const mediaCombinada = ((mediaGolsMarcadosA + mediaGolsSofridosA) + (mediaGolsMarcadosB + mediaGolsSofridosB)) / 2;
-
-        let sugestaoGols = "";
-        if (mediaCombinada > 2.5) {
-            sugestaoGols = `Sugestão de Gols (método média combinada): Over 1.5 (Média: ${mediaCombinada.toFixed(2)})\n\n`;
-        } else {
-            sugestaoGols = `Sugestão de Gols (método média combinada): Under 3.5 (Média: ${mediaCombinada.toFixed(2)})\n\n`;
-        }
 
         // Monta texto final
         const textoFinal =
@@ -246,10 +259,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             `Ajuste frequência (Vitórias + 0.5 * Empates): ${(ajusteResultados * 100).toFixed(2)}%\n\n` +
 
-            `Sugestões:\n${sugestaoBTTS}\n${sugestaoOver25}\n${sugestaoDuplaChance}`;
+            `Sugestões:\n${sugestaoBTTS}\n${sugestaoDuplaChance}`;
 
         resultadoDiv.textContent = textoFinal;
     });
+
 
 
     // Preencher automático com dados exemplo
