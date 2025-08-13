@@ -1,95 +1,188 @@
+// --- Funções auxiliares ---
+
+function calcularPesosOddsDuplaChance(oddVitoriaA, oddEmpate, oddVitoriaB) {
+    const probVitoriaA = 1 / oddVitoriaA;
+    const probEmpate = 1 / oddEmpate;
+    const probVitoriaB = 1 / oddVitoriaB;
+
+    const somaProbs = probVitoriaA + probEmpate + probVitoriaB;
+
+    const pA = probVitoriaA / somaProbs;
+    const pE = probEmpate / somaProbs;
+    const pB = probVitoriaB / somaProbs;
+
+    return {
+        dcAouEmpate: pA + pE,
+        dcBouEmpate: pB + pE,
+        dcAouB: pA + pB
+    };
+}
+
+function calcularMedia(valores) {
+    const soma = valores.reduce((acc, val) => acc + val, 0);
+    return valores.length ? soma / valores.length : 0;
+}
+
+function calcularFrequenciaResultados(golsMarcados, golsSofridos) {
+    let v = 0, e = 0, d = 0;
+    for (let i = 0; i < golsMarcados.length; i++) {
+        if (golsMarcados[i] > golsSofridos[i]) v++;
+        else if (golsMarcados[i] === golsSofridos[i]) e++;
+        else d++;
+    }
+    return { v, e, d };
+}
+
+function calcularProbBTTS(golsMarcadosA, golsSofridosA, golsMarcadosB, golsSofridosB, cdGolsTimeA, cdGolsTimeB) {
+    const mediaGolsMarcadosA = calcularMedia(golsMarcadosA);
+    const mediaGolsSofridosA = calcularMedia(golsSofridosA);
+    const mediaGolsMarcadosB = calcularMedia(golsMarcadosB);
+    const mediaGolsSofridosB = calcularMedia(golsSofridosB);
+    const mediaCDGolsA = calcularMedia(cdGolsTimeA);
+    const mediaCDGolsB = calcularMedia(cdGolsTimeB);
+
+    const probA = mediaGolsMarcadosA * mediaGolsSofridosB;
+    const probB = mediaGolsMarcadosB * mediaGolsSofridosA;
+    const probGeral = (probA + probB) / 2;
+
+    const probCD = (mediaCDGolsA + mediaCDGolsB) / 2;
+
+    const freqResultadosA = calcularFrequenciaResultados(golsMarcadosA, golsSofridosA);
+    const freqResultadosB = calcularFrequenciaResultados(golsMarcadosB, golsSofridosB);
+    const totalJogos = golsMarcadosA.length;
+    const pontuacaoA = freqResultadosA.v + freqResultadosA.e * 0.5;
+    const pontuacaoB = freqResultadosB.v + freqResultadosB.e * 0.5;
+    const ajusteResultados = (pontuacaoA + pontuacaoB) / (2 * totalJogos);
+
+    const pesoMedias = 0.6;
+    const pesoResultados = 0.3;
+    const pesoConfrontos = 0.1;
+
+    const probTotal = (probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos);
+
+    const maxProbGeral = Math.max(
+        mediaGolsMarcadosA * mediaGolsSofridosB,
+        mediaGolsMarcadosB * mediaGolsSofridosA
+    ) * 2;
+
+    const maxAjusteResultados = 1;
+    const maxProbCD = 5;
+
+    const maxValorEsperado =
+        (maxProbGeral * pesoMedias) +
+        (maxAjusteResultados * pesoResultados) +
+        (maxProbCD * pesoConfrontos);
+
+    let probBTTS = (probTotal / maxValorEsperado) * 100;
+
+    if (probBTTS > 100) probBTTS = 100;
+    if (probBTTS < 0) probBTTS = 0;
+
+    return probBTTS;
+}
+
+function calcularProbNaoBTTS(probBTTS) {
+    let probNaoBTTS = 100 - probBTTS;
+    if (probNaoBTTS < 0) probNaoBTTS = 0;
+    if (probNaoBTTS > 100) probNaoBTTS = 100;
+    return probNaoBTTS;
+}
+
+function contarJogosOver25(marcados, sofridos) {
+    let count = 0;
+    for (let i = 0; i < marcados.length; i++) {
+        if ((marcados[i] + sofridos[i]) > 2.5) count++;
+    }
+    return count;
+}
+
+function pegarValoresClasse(classe) {
+    const inputs = Array.from(document.querySelectorAll(`.${classe}`));
+    return inputs.map(input => parseFloat(input.value) || 0);
+}
+
+function factorial(n) {
+    if (n === 0) return 1;
+    let f = 1;
+    for (let i = 1; i <= n; i++) f *= i;
+    return f;
+}
+
+function poisson(k, lambda) {
+    return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
+}
+
+function probOverX(lambdaA, lambdaB, x) {
+    let prob = 0;
+    const maxGols = 10;
+    for (let golsA = 0; golsA <= maxGols; golsA++) {
+        for (let golsB = 0; golsB <= maxGols; golsB++) {
+            if ((golsA + golsB) > x) {
+                prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
+            }
+        }
+    }
+    return prob * 100;
+}
+
+// --- Função principal que gera sugestão combinada ---
+
+function gerarSugestaoCombinada(
+    probTimeAouEmpate, pontuacaoPonderadaA,
+    probTimeBouEmpate, pontuacaoPonderadaB,
+    probTimeAouTimeB, pontuacaoPonderadaA2, pontuacaoPonderadaB2,
+    probsOdds,
+    probMais2_5
+) {
+    const pesoHistorico = 0.6;
+    const pesoOdds = 0.4;
+
+    const scoreAouEmpate = (((probTimeAouEmpate + pontuacaoPonderadaA) / 2) * pesoHistorico) + (probsOdds.dcAouEmpate * pesoOdds);
+    const scoreBouEmpate = (((probTimeBouEmpate + pontuacaoPonderadaB) / 2) * pesoHistorico) + (probsOdds.dcBouEmpate * pesoOdds);
+    const scoreAouB = (((probTimeAouTimeB + ((pontuacaoPonderadaA2 + pontuacaoPonderadaB2) / 2)) / 2) * pesoHistorico) + (probsOdds.dcAouB * pesoOdds);
+
+    const opcoesDC = [
+        { tipo: 'Time A ou Empate', score: scoreAouEmpate },
+        { tipo: 'Time B ou Empate', score: scoreBouEmpate },
+        { tipo: 'Time A ou Time B', score: scoreAouB }
+    ];
+
+    opcoesDC.sort((a, b) => b.score - a.score);
+    const melhorDC = opcoesDC[0];
+
+    const limiar = 65; // Só sugere se o score for maior que isso
+
+    if (melhorDC.score < limiar) {
+        const segundaOpcao = opcoesDC[1];
+        const apostaGolsSegura = 'Menos de 3.5 gols';
+        return `Sugestão combinada segura: <strong>${melhorDC.tipo} + ${apostaGolsSegura}</strong><br>` +
+            `Sugestão combinada alternativa: <strong>${segundaOpcao.tipo} + ${apostaGolsSegura}</strong>`;
+    }
+
+    let apostaGols = '';
+    if (probMais2_5 >= 70) {
+        apostaGols = 'Mais de 2.5 gols';
+    } else if (probMais2_5 >= 50) {
+        apostaGols = 'Mais de 1.5 gols';
+    } else {
+        apostaGols = 'Menos de 3.5 gols';
+    }
+
+    return `Sugestão combinada: <strong>${melhorDC.tipo} + ${apostaGols}</strong>`;
+}
+
+// --- Evento DOMContentLoaded e manipulação do form ---
+
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('btForm');
     const resultadoDiv = document.getElementById('resultado');
     const btnPreencher = document.getElementById('btnPreencher');
     const btnLimpar = document.getElementById('btnLimpar');
 
-    // Calcula média de um array numérico
-    function calcularMedia(valores) {
-        const soma = valores.reduce((acc, val) => acc + val, 0);
-        return valores.length ? soma / valores.length : 0;
-    }
-
-    // Conta frequência de resultados: vitórias, empates, derrotas
-    function calcularFrequenciaResultados(golsMarcados, golsSofridos) {
-        let v = 0, e = 0, d = 0;
-        for (let i = 0; i < golsMarcados.length; i++) {
-            if (golsMarcados[i] > golsSofridos[i]) v++;
-            else if (golsMarcados[i] === golsSofridos[i]) e++;
-            else d++;
-        }
-        return { v, e, d };
-    }
-
-    // Calcula probabilidade BTTS ponderada
-    function calcularProbBTTS(golsMarcadosA, golsSofridosA, golsMarcadosB, golsSofridosB, cdGolsTimeA, cdGolsTimeB) {
-        const mediaGolsMarcadosA = calcularMedia(golsMarcadosA);
-        const mediaGolsSofridosA = calcularMedia(golsSofridosA);
-        const mediaGolsMarcadosB = calcularMedia(golsMarcadosB);
-        const mediaGolsSofridosB = calcularMedia(golsSofridosB);
-        const mediaCDGolsA = calcularMedia(cdGolsTimeA);
-        const mediaCDGolsB = calcularMedia(cdGolsTimeB);
-
-        // Probabilidades base
-        const probA = mediaGolsMarcadosA * mediaGolsSofridosB;
-        const probB = mediaGolsMarcadosB * mediaGolsSofridosA;
-        const probGeral = (probA + probB) / 2;
-
-        // Média confronto direto
-        const probCD = (mediaCDGolsA + mediaCDGolsB) / 2;
-
-        // Frequência resultados para ajuste
-        const freqResultadosA = calcularFrequenciaResultados(golsMarcadosA, golsSofridosA);
-        const freqResultadosB = calcularFrequenciaResultados(golsMarcadosB, golsSofridosB);
-        const totalJogos = golsMarcadosA.length;
-        const pontuacaoA = freqResultadosA.v + freqResultadosA.e * 0.5;
-        const pontuacaoB = freqResultadosB.v + freqResultadosB.e * 0.5;
-        const ajusteResultados = (pontuacaoA + pontuacaoB) / (2 * totalJogos);
-
-        // Pesos
-        const pesoMedias = 0.6;
-        const pesoResultados = 0.3;
-        const pesoConfrontos = 0.1;
-
-        // Probabilidade total ponderada
-        const probTotal = (probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos);
-
-        // Normaliza para percentual (máximo esperado = 4)
-        const maxValorEsperado = 4;
-        let probBTTS = (probTotal / maxValorEsperado) * 100;
-        if (probBTTS > 100) probBTTS = 100;
-        if (probBTTS < 0) probBTTS = 0;
-
-        return probBTTS;
-    }
-
-    // Probabilidade de não BTTS (complementar)
-    function calcularProbNaoBTTS(probBTTS) {
-        let probNaoBTTS = 100 - probBTTS;
-        if (probNaoBTTS < 0) probNaoBTTS = 0;
-        if (probNaoBTTS > 100) probNaoBTTS = 100;
-        return probNaoBTTS;
-    }
-
-    // Conta quantos jogos tiveram +2.5 gols
-    function contarJogosOver25(marcados, sofridos) {
-        let count = 0;
-        for (let i = 0; i < marcados.length; i++) {
-            if ((marcados[i] + sofridos[i]) > 2.5) count++;
-        }
-        return count;
-    }
-
-    // Função para pegar valores das inputs de uma classe, retornando array numérico
-    function pegarValoresClasse(classe) {
-        const inputs = Array.from(document.querySelectorAll(`.${classe}`));
-        return inputs.map(input => parseFloat(input.value) || 0);
-    }
-
     form.addEventListener('submit', (e) => {
         e.preventDefault();
 
-        // Pega os dados
+        // Pegar valores dos inputs
         const golsMarcadosA = pegarValoresClasse('timeA_gols_marcados');
         const golsSofridosA = pegarValoresClasse('timeA_gols_sofridos');
         const golsMarcadosB = pegarValoresClasse('timeB_gols_marcados');
@@ -99,7 +192,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const totalJogos = golsMarcadosA.length;
 
-        // Calcula médias ofensivas/defensivas
+        const oddVitoriaA = parseFloat(document.getElementById('odd_vitoriaA').value) || 0;
+        const oddEmpate = parseFloat(document.getElementById('odd_empate').value) || 0;
+        const oddVitoriaB = parseFloat(document.getElementById('odd_vitoriaB').value) || 0;
+
+        // Médias dos times
         const mediaGolsMarcadosA = calcularMedia(golsMarcadosA);
         const mediaGolsSofridosA = calcularMedia(golsSofridosA);
         const mediaGolsMarcadosB = calcularMedia(golsMarcadosB);
@@ -108,10 +205,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const mediaCDGolsA = calcularMedia(cdGolsTimeA);
         const mediaCDGolsB = calcularMedia(cdGolsTimeB);
 
-        // Frequência resultados
+        // Frequência de resultados
         const freqResultadosA = calcularFrequenciaResultados(golsMarcadosA, golsSofridosA);
         const freqResultadosB = calcularFrequenciaResultados(golsMarcadosB, golsSofridosB);
 
+        // Porcentagens
         const pctVitoriaA = (freqResultadosA.v / totalJogos) * 100;
         const pctEmpateA = (freqResultadosA.e / totalJogos) * 100;
         const pctDerrotaA = (freqResultadosA.d / totalJogos) * 100;
@@ -120,25 +218,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const pctEmpateB = (freqResultadosB.e / totalJogos) * 100;
         const pctDerrotaB = (freqResultadosB.d / totalJogos) * 100;
 
-        // Pesos para Dupla Chance
+        // Pesos para pontuação ponderada
         const pesoVitoria = 0.5;
         const pesoEmpate = 0.3;
         const pesoDerrota = 0.2;
 
-        // Calcula pontuação ponderada dos resultados para cada time
         const pontuacaoPonderadaA = (pctVitoriaA * pesoVitoria) + (pctEmpateA * pesoEmpate) + (pctDerrotaA * pesoDerrota);
         const pontuacaoPonderadaB = (pctVitoriaB * pesoVitoria) + (pctEmpateB * pesoEmpate) + (pctDerrotaB * pesoDerrota);
 
-        // Calcula as probabilidades simples para cada tipo de dupla chance:
         const probTimeAouEmpate = pctVitoriaA + pctEmpateA;
         const probTimeBouEmpate = pctVitoriaB + pctEmpateB;
         const probTimeAouTimeB = pctVitoriaA + pctVitoriaB;
 
-        // Função para gerar sugestão simples baseada na maior probabilidade
+        const probsOdds = calcularPesosOddsDuplaChance(oddVitoriaA, oddEmpate, oddVitoriaB);
+
+        // Sugestão Dupla Chance
         function gerarSugestaoDuplaChance() {
-            const scoreTimeAouEmpate = probTimeAouEmpate + pontuacaoPonderadaA;
-            const scoreTimeBouEmpate = probTimeBouEmpate + pontuacaoPonderadaB;
-            const scoreTimeAouTimeB = probTimeAouTimeB + ((pontuacaoPonderadaA + pontuacaoPonderadaB) / 2);
+            const scoreTimeAouEmpate = (probTimeAouEmpate + pontuacaoPonderadaA) * probsOdds.dcAouEmpate;
+            const scoreTimeBouEmpate = (probTimeBouEmpate + pontuacaoPonderadaB) * probsOdds.dcBouEmpate;
+            const scoreTimeAouTimeB = (probTimeAouTimeB + ((pontuacaoPonderadaA + pontuacaoPonderadaB) / 2)) * probsOdds.dcAouB;
 
             const opcoes = [
                 { tipo: 'Time A ou Empate', valor: probTimeAouEmpate, score: scoreTimeAouEmpate },
@@ -150,61 +248,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const diff12 = Math.abs(opcoes[0].valor - opcoes[1].valor);
             if (diff12 < 2) {
-                return `Sugestão de aposta Dupla Chance: **${opcoes[0].tipo}** com probabilidade de ${opcoes[0].valor.toFixed(1)}% (desempate por performance)`;
+                return `Sugestão de aposta Dupla Chance: <strong>${opcoes[0].tipo}</strong> com probabilidade de ${opcoes[0].valor.toFixed(1)}% (desempate por performance)`;
             }
 
-            return `Sugestão de aposta Dupla Chance: **${opcoes[0].tipo}** com probabilidade de ${opcoes[0].valor.toFixed(1)}%`;
+            return `Sugestão de aposta Dupla Chance: <strong>${opcoes[0].tipo}</strong> com probabilidade de ${opcoes[0].valor.toFixed(1)}%`;
         }
 
-        // Probabilidade BTTS
         const probBTTS = calcularProbBTTS(golsMarcadosA, golsSofridosA, golsMarcadosB, golsSofridosB, cdGolsTimeA, cdGolsTimeB);
         const probNaoBTTS = calcularProbNaoBTTS(probBTTS);
 
-        // Estimativa placar provável (baseado nas médias)
         const estimativaGolsA = ((mediaGolsMarcadosA + mediaGolsSofridosB) / 2).toFixed(1);
         const estimativaGolsB = ((mediaGolsMarcadosB + mediaGolsSofridosA) / 2).toFixed(1);
 
         const placarProvavel =
             `### Estimativa de Placar Provável\n` +
             `O jogo tende a ser equilibrado, com chances de:\n` +
-            `🟢 Time A marcar cerca de **${estimativaGolsA} gols**\n` +
-            `🔴 Time B marcar cerca de **${estimativaGolsB} gols**\n\n`;
+            `🟢 Time A marcar cerca de <strong>${estimativaGolsA} gols</strong>\n` +
+            `🔴 Time B marcar cerca de <strong>${estimativaGolsB} gols</strong>\n\n`;
 
-        // Frequência real +2.5 gols
         const overA = contarJogosOver25(golsMarcadosA, golsSofridosA);
         const overB = contarJogosOver25(golsMarcadosB, golsSofridosB);
         const freqReal = ((overA + overB) / (totalJogos * 2)) * 100;
-
-        // Média total gols ofensivos + defensivos
-        const mediaTotalGols = mediaGolsMarcadosA + mediaGolsSofridosA + mediaGolsMarcadosB + mediaGolsSofridosB;
-
-        // Média gols confronto direto
-        const mediaConfrontoGols = mediaCDGolsA + mediaCDGolsB;
-
-        // Probabilidade Over 2.5 gols (usando Poisson)
-        function factorial(n) {
-            if (n === 0) return 1;
-            let f = 1;
-            for (let i = 1; i <= n; i++) f *= i;
-            return f;
-        }
-
-        function poisson(k, lambda) {
-            return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k);
-        }
-
-        function probOverX(lambdaA, lambdaB, x) {
-            let prob = 0;
-            const maxGols = 10;
-            for (let golsA = 0; golsA <= maxGols; golsA++) {
-                for (let golsB = 0; golsB <= maxGols; golsB++) {
-                    if ((golsA + golsB) > x) {
-                        prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
-                    }
-                }
-            }
-            return prob * 100;
-        }
 
         const lambdaA = (mediaGolsMarcadosA + mediaGolsSofridosB) / 2;
         const lambdaB = (mediaGolsMarcadosB + mediaGolsSofridosA) / 2;
@@ -220,7 +284,6 @@ document.addEventListener('DOMContentLoaded', () => {
             sugestaoGols = `Jogo com menor probabilidade de mais de 2.5 gols (${probMais2_5.toFixed(1)}%).\n\n`;
         }
 
-        // Sugestões baseadas nas probabilidades BTTS e Dupla Chance
         let sugestaoBTTS = "";
         if (probBTTS >= 60) sugestaoBTTS = "Boa chance de ambos os times marcarem (BTTS).";
         else if (probBTTS >= 40) sugestaoBTTS = "Probabilidade moderada para BTTS.";
@@ -228,15 +291,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const sugestaoDuplaChance = gerarSugestaoDuplaChance();
 
-        // Ajuste frequência (Vitórias + 0.5 * Empates)
-        const pontuacaoA = freqResultadosA.v + freqResultadosA.e * 0.5;
-        const pontuacaoB = freqResultadosB.v + freqResultadosB.e * 0.5;
-        const ajusteResultados = (pontuacaoA + pontuacaoB) / (2 * totalJogos);
-
-        // Monta texto final
         const textoFinal =
             placarProvavel +
-
             `Probabilidade aproximada de "Ambos os Times Marcam (BTTS)": ${probBTTS.toFixed(2)}%\n` +
             `Probabilidade aproximada de "Ambos os Times NÃO Marcam": ${probNaoBTTS.toFixed(2)}%\n\n` +
 
@@ -248,62 +304,48 @@ document.addEventListener('DOMContentLoaded', () => {
             `- Time A: Média gols marcados ${mediaGolsMarcadosA.toFixed(2)}, gols sofridos ${mediaGolsSofridosA.toFixed(2)}\n` +
             `- Time B: Média gols marcados ${mediaGolsMarcadosB.toFixed(2)}, gols sofridos ${mediaGolsSofridosB.toFixed(2)}\n\n` +
 
-            sugestaoGols +
+            `Sugestão de aposta BTTS: <strong>${sugestaoBTTS}</strong><br>` +
+            `${sugestaoDuplaChance}<br><br>` +
 
-            `Frequência de Resultados:\n` +
-            `- Time A: ${pctVitoriaA.toFixed(1)}% vitórias, ${pctEmpateA.toFixed(1)}% empates, ${pctDerrotaA.toFixed(1)}% derrotas\n` +
-            `- Time B: ${pctVitoriaB.toFixed(1)}% vitórias, ${pctEmpateB.toFixed(1)}% empates, ${pctDerrotaB.toFixed(1)}% derrotas\n\n` +
+            `Sugestão combinada:<br>` +
+            `${gerarSugestaoCombinada(
+                probTimeAouEmpate, pontuacaoPonderadaA,
+                probTimeBouEmpate, pontuacaoPonderadaB,
+                probTimeAouTimeB, pontuacaoPonderadaA, pontuacaoPonderadaB,
+                probsOdds,
+                probMais2_5
+            )}`;
 
-            `Confronto Direto:\n` +
-            `- Média combinada de gols nos últimos ${totalJogos} jogos diretos: ${mediaConfrontoGols.toFixed(2)} gols por jogo\n\n` +
-
-            `Ajuste frequência (Vitórias + 0.5 * Empates): ${(ajusteResultados * 100).toFixed(2)}%\n\n` +
-
-            `Sugestões:\n${sugestaoBTTS}\n${sugestaoDuplaChance}`;
-
-        resultadoDiv.textContent = textoFinal;
+        resultadoDiv.innerHTML = textoFinal.replace(/\n/g, '<br>');
     });
 
-
-
-    // Preencher automático com dados exemplo
     btnPreencher.addEventListener('click', () => {
-        function preencherClasse(classe, valores) {
-            const inputs = document.querySelectorAll(`.${classe}`);
-            inputs.forEach((input, i) => {
-                input.value = valores[i] !== undefined ? valores[i] : '';
-            });
-        }
+        // Exemplos rápidos para testar
+        document.querySelectorAll('.timeA_gols_marcados').forEach((el, i) => el.value = [2, 1, 3, 0, 2][i] || 0);
+        document.querySelectorAll('.timeA_gols_sofridos').forEach((el, i) => el.value = [1, 0, 1, 1, 0][i] || 0);
+        document.querySelectorAll('.timeB_gols_marcados').forEach((el, i) => el.value = [1, 2, 0, 2, 1][i] || 0);
+        document.querySelectorAll('.timeB_gols_sofridos').forEach((el, i) => el.value = [2, 1, 3, 0, 2][i] || 0);
 
-        preencherClasse('timeA_gols_marcados', [3, 2, 4, 3, 2]);
-        preencherClasse('timeA_gols_sofridos', [1, 2, 2, 1, 1]);
+        document.querySelectorAll('.cd_gols_timeA').forEach((el, i) => el.value = [2, 1, 2, 1, 2][i] || 0);
+        document.querySelectorAll('.cd_gols_timeB').forEach((el, i) => el.value = [1, 1, 0, 2, 1][i] || 0);
 
-        preencherClasse('timeB_gols_marcados', [2, 3, 3, 2, 3]);
-        preencherClasse('timeB_gols_sofridos', [2, 1, 1, 2, 1]);
+        document.getElementById('odd_vitoriaA').value = '1.80';
+        document.getElementById('odd_empate').value = '3.30';
+        document.getElementById('odd_vitoriaB').value = '4.20';
 
-        preencherClasse('cd_gols_timeA', [2, 3, 1, 2, 2]);
-        preencherClasse('cd_gols_timeB', [2, 2, 1, 1, 3]);
-
-        resultadoDiv.textContent = '';
+        resultadoDiv.innerHTML = '';
     });
 
-    // Limpar todos os campos
     btnLimpar.addEventListener('click', () => {
-        function limparClasse(classe) {
-            const inputs = document.querySelectorAll(`.${classe}`);
-            inputs.forEach(input => input.value = '');
-        }
-
-        limparClasse('timeA_gols_marcados');
-        limparClasse('timeA_gols_sofridos');
-        limparClasse('timeB_gols_marcados');
-        limparClasse('timeB_gols_sofridos');
-        limparClasse('cd_gols_timeA');
-        limparClasse('cd_gols_timeB');
-
-        resultadoDiv.textContent = '';
+        document.querySelectorAll('input').forEach(input => input.value = '');
+        resultadoDiv.innerHTML = '';
     });
 });
+
+
+
+
+// apagar aqui --><!-- -->
 
 
 
