@@ -47,16 +47,17 @@ function calcularProbBTTS(gA, sA, gB, sB, cdA, cdB) {
 
     const probTotal = (probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos);
 
-    const maxProbTotal = (Math.max(mediaGolsMarcadosA * mediaGolsSofridosB, mediaGolsMarcadosB * mediaGolsSofridosA) * 2 * pesoMedias) + (1 * pesoResultados) + (5 * pesoConfrontos);
-    let probBTTS = (probTotal / maxProbTotal) * 100;
-    probBTTS = Math.min(Math.max(probBTTS, 0), 100);
+    let probBTTS = Math.min(Math.max(probTotal * 25, 5), 95); // Limites 5% a 95%
     return probBTTS;
 }
 
-function calcularProbNaoBTTS(probBTTS) { return Math.min(Math.max(100 - probBTTS, 0), 100); }
+function calcularProbNaoBTTS(probBTTS) {
+    return 100 - probBTTS;
+}
 
 function factorial(n) { if (n === 0) return 1; let f = 1; for (let i = 1; i <= n; i++) f *= i; return f; }
 function poisson(k, lambda) { return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k); }
+
 function probOverX(lambdaA, lambdaB, x) {
     let prob = 0;
     const maxGols = 10;
@@ -65,19 +66,22 @@ function probOverX(lambdaA, lambdaB, x) {
             if (golsA + golsB > x) prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
         }
     }
-    return prob * 100;
+    prob = prob * 100;
+    return Math.min(Math.max(prob, 5), 95);
 }
+
 function pegarValoresClasse(classe) {
     return Array.from(document.querySelectorAll(`.${classe}`)).map(input => parseFloat(input.value) || 0);
 }
 
-// Sugestão combinada
-function gerarSugestaoCombinada(probTimeAouEmpate, pontA, probTimeBouEmpate, pontB, probTimeAouB, pontA2, pontB2, probsOdds, probMais2_5) {
+// --- Sugestão combinada dinâmica ---
+function gerarSugestaoCombinada(probTimeAouEmpate, freqA, probTimeBouEmpate, freqB, probTimeAouB, probsOdds, probMais2_5, probBTTS) {
     const pesoHistorico = 0.6;
     const pesoOdds = 0.4;
-    const scoreAouEmpate = (((probTimeAouEmpate + pontA) / 2) * pesoHistorico) + (probsOdds.dcAouEmpate * pesoOdds);
-    const scoreBouEmpate = (((probTimeBouEmpate + pontB) / 2) * pesoHistorico) + (probsOdds.dcBouEmpate * pesoOdds);
-    const scoreAouB = (((probTimeAouB + ((pontA2 + pontB2) / 2)) / 2) * pesoHistorico) + (probsOdds.dcAouB * pesoOdds);
+
+    const scoreAouEmpate = ((probTimeAouEmpate + (freqA.v + freqA.e * 0.5) / (freqA.v + freqA.e + freqA.d)) * pesoHistorico) + (probsOdds.dcAouEmpate * pesoOdds);
+    const scoreBouEmpate = ((probTimeBouEmpate + (freqB.v + freqB.e * 0.5) / (freqB.v + freqB.e + freqB.d)) * pesoHistorico) + (probsOdds.dcBouEmpate * pesoOdds);
+    const scoreAouB = ((probTimeAouB + 0.5 * ((freqA.v + freqA.e * 0.5) / (freqA.v + freqA.e + freqA.d) + (freqB.v + freqB.e * 0.5) / (freqB.v + freqB.e + freqB.d))) * pesoHistorico) + (probsOdds.dcAouB * pesoOdds);
 
     const opcoesDC = [
         { tipo: 'Time A ou Empate', score: scoreAouEmpate },
@@ -86,14 +90,18 @@ function gerarSugestaoCombinada(probTimeAouEmpate, pontA, probTimeBouEmpate, pon
     ];
     opcoesDC.sort((a, b) => b.score - a.score);
     const melhorDC = opcoesDC[0];
-    const limiar = 65;
-    if (melhorDC.score < limiar) {
-        const segundaOpcao = opcoesDC[1];
-        return `Sugestão combinada segura: <strong>${melhorDC.tipo} + Menos de 3.5 gols</strong><br>` +
-            `Sugestão combinada alternativa: <strong>${segundaOpcao.tipo} + Menos de 3.5 gols</strong>`;
-    }
-    let apostaGols = probMais2_5 >= 70 ? 'Mais de 2.5 gols' : (probMais2_5 >= 50 ? 'Mais de 1.5 gols' : 'Menos de 3.5 gols');
-    return `Sugestão combinada: <strong>${melhorDC.tipo} + ${apostaGols}</strong>`;
+    const segundaOpcao = opcoesDC[1];
+
+    let apostaGols = '';
+    if (probMais2_5 >= 70 && probBTTS >= 50) apostaGols = 'Mais de 2.5 gols';
+    else if (probMais2_5 >= 50 && probBTTS >= 40) apostaGols = 'Mais de 1.5 gols';
+    else apostaGols = 'Menos de 3.5 gols';
+
+    return {
+        sugestaoDC: melhorDC.tipo,
+        sugestaoCombinada: `Sugestão combinada segura: ${melhorDC.tipo} + ${apostaGols}<br>` +
+            `Sugestão combinada alternativa: ${segundaOpcao.tipo} + ${apostaGols}`
+    };
 }
 
 // --- DOM e eventos ---
@@ -128,25 +136,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const lambdaB = (mediaGolsB + mediaSofridosA) / 2;
         const probMais2_5 = probOverX(lambdaA, lambdaB, 2);
 
-        return { probBTTS, probNaoBTTS, probsOdds, probMais2_5, mediaGolsA, mediaSofridosA, mediaGolsB, mediaSofridosB };
+        const freqA = calcularFrequenciaResultados(gA, sA);
+        const freqB = calcularFrequenciaResultados(gB, sB);
+
+        return { probBTTS, probNaoBTTS, probsOdds, probMais2_5, mediaGolsA, mediaSofridosA, mediaGolsB, mediaSofridosB, freqA, freqB };
     }
 
     function gerarSugestoes(prob) {
-        const { probBTTS, probsOdds, probMais2_5 } = prob;
+        const { probBTTS, probsOdds, probMais2_5, freqA, freqB } = prob;
         const sugestaoBTTS = probBTTS >= 60 ? "Boa chance de ambos os times marcarem (BTTS)." :
             probBTTS >= 40 ? "Probabilidade moderada para BTTS." :
                 "Baixa chance de ambos os times marcarem.";
 
-        // Sugestão Dupla Chance dinâmica
-        const opcoesDC = [
-            { tipo: 'Time A ou Empate', score: probsOdds.dcAouEmpate },
-            { tipo: 'Time B ou Empate', score: probsOdds.dcBouEmpate },
-            { tipo: 'Time A ou Time B', score: probsOdds.dcAouB }
-        ];
-        opcoesDC.sort((a, b) => b.score - a.score);
-        const sugestaoDC = opcoesDC[0].tipo;
-
-        const sugestaoCombinada = gerarSugestaoCombinada(50, 50, 50, 50, 50, 50, 50, probsOdds, probMais2_5);
+        const { sugestaoDC, sugestaoCombinada } = gerarSugestaoCombinada(50, freqA, 50, freqB, 50, probsOdds, probMais2_5, probBTTS);
         return { sugestaoBTTS, sugestaoDC, sugestaoCombinada };
     }
 
@@ -158,26 +160,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const estimativaB = ((mediaGolsB + mediaSofridosA) / 2).toFixed(1);
 
         const texto = `
-            ### Estimativa de Placar Provável
-            O jogo tende a ser equilibrado, com chances de:
-            🟢 Time A marcar cerca de <strong>${estimativaA} gols</strong>
-            🔴 Time B marcar cerca de <strong>${estimativaB} gols</strong>
+### Estimativa de Placar Provável
+O jogo tende a ser equilibrado, com chances de:
+🟢 Time A marcar cerca de <strong>${estimativaA} gols</strong>
+🔴 Time B marcar cerca de <strong>${estimativaB} gols</strong>
 
-            Probabilidade aproximada de "Ambos os Times Marcam (BTTS)": ${probBTTS.toFixed(2)}%
-            Probabilidade aproximada de "Ambos os Times NÃO Marcam": ${probNaoBTTS.toFixed(2)}%
+Probabilidade aproximada de "Ambos os Times Marcam (BTTS)": ${probBTTS.toFixed(2)}%
+Probabilidade aproximada de "Ambos os Times NÃO Marcam": ${probNaoBTTS.toFixed(2)}%
 
-            Probabilidade aproximada de Over/Under +2.5 Gols:
-            - Mais de 2.5 gols: ${probMais2_5.toFixed(2)}%
-            - Menos de 2.5 gols: ${(100 - probMais2_5).toFixed(2)}%
+Probabilidade aproximada de Over/Under +2.5 Gols:
+- Mais de 2.5 gols: ${probMais2_5.toFixed(2)}%
+- Menos de 2.5 gols: ${(100 - probMais2_5).toFixed(2)}%
 
-            Resumo Ofensivo e Defensivo:
-            - Time A: Média gols marcados ${mediaGolsA.toFixed(2)}, gols sofridos ${mediaSofridosA.toFixed(2)}
-            - Time B: Média gols marcados ${mediaGolsB.toFixed(2)}, gols sofridos ${mediaSofridosB.toFixed(2)}
+Resumo Ofensivo e Defensivo:
+- Time A: Média gols marcados ${mediaGolsA.toFixed(2)}, gols sofridos ${mediaSofridosA.toFixed(2)}
+- Time B: Média gols marcados ${mediaGolsB.toFixed(2)}, gols sofridos ${mediaSofridosB.toFixed(2)}
 
-            Sugestão de aposta BTTS: <strong>${sugestaoBTTS}</strong><br>
-            Sugestão Dupla Chance: <strong>${sugestaoDC}</strong><br>
-            Sugestão combinada:<br>
-            ${sugestaoCombinada}
+Sugestão de aposta BTTS: <strong>${sugestaoBTTS}</strong><br>
+Sugestão Dupla Chance: <strong>${sugestaoDC}</strong><br>
+Sugestão combinada:<br>${sugestaoCombinada}
         `;
         resultadoDiv.innerHTML = texto.replace(/\n/g, '<br>');
     }
@@ -202,6 +203,21 @@ document.addEventListener('DOMContentLoaded', () => {
         exibirResultado(prob, sug);
     });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
