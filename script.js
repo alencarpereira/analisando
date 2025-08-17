@@ -11,9 +11,11 @@ function calcularPesosOddsDuplaChance(oddVitoriaA, oddEmpate, oddVitoriaB) {
     };
 }
 
-function calcularMedia(valores) {
-    const soma = valores.reduce((acc, val) => acc + val, 0);
-    return valores.length ? soma / valores.length : 0;
+function calcularMediaPonderada(valores, pesos) {
+    if (!valores.length) return 0;
+    const somaPesos = pesos.reduce((acc, p) => acc + p, 0);
+    const total = valores.reduce((acc, val, i) => acc + val * (pesos[i] || 1), 0);
+    return total / somaPesos;
 }
 
 function calcularFrequenciaResultados(golsMarcados, golsSofridos) {
@@ -27,12 +29,14 @@ function calcularFrequenciaResultados(golsMarcados, golsSofridos) {
 }
 
 function calcularProbBTTS(gA, sA, gB, sB, cdA, cdB) {
-    const mediaGolsMarcadosA = calcularMedia(gA);
-    const mediaGolsSofridosA = calcularMedia(sA);
-    const mediaGolsMarcadosB = calcularMedia(gB);
-    const mediaGolsSofridosB = calcularMedia(sB);
-    const mediaCDGolsA = calcularMedia(cdA);
-    const mediaCDGolsB = calcularMedia(cdB);
+    const pesos = Array(gA.length).fill(1).map((_, i) => i + 1);
+
+    const mediaGolsMarcadosA = calcularMediaPonderada(gA, pesos);
+    const mediaGolsSofridosA = calcularMediaPonderada(sA, pesos);
+    const mediaGolsMarcadosB = calcularMediaPonderada(gB, pesos);
+    const mediaGolsSofridosB = calcularMediaPonderada(sB, pesos);
+    const mediaCDGolsA = calcularMediaPonderada(cdA, pesos);
+    const mediaCDGolsB = calcularMediaPonderada(cdB, pesos);
 
     const probGeral = ((mediaGolsMarcadosA * mediaGolsSofridosB) + (mediaGolsMarcadosB * mediaGolsSofridosA)) / 2;
     const probCD = (mediaCDGolsA + mediaCDGolsB) / 2;
@@ -41,13 +45,13 @@ function calcularProbBTTS(gA, sA, gB, sB, cdA, cdB) {
     const freqB = calcularFrequenciaResultados(gB, sB);
     const ajusteResultados = ((freqA.v + freqA.e * 0.5) + (freqB.v + freqB.e * 0.5)) / (2 * gA.length);
 
-    const pesoMedias = 0.6;
-    const pesoResultados = 0.3;
-    const pesoConfrontos = 0.1;
+    const pesoMedias = 0.5;
+    const pesoResultados = 0.35;
+    const pesoConfrontos = 0.15;
 
     const probTotal = (probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos);
 
-    return Math.min(Math.max(probTotal * 25, 5), 95);
+    return Math.min(Math.max(probTotal * 25, 10), 95);
 }
 
 function calcularProbNaoBTTS(probBTTS) {
@@ -65,14 +69,26 @@ function probOverX(lambdaA, lambdaB, x) {
             if (golsA + golsB > x) prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
         }
     }
-    return Math.min(Math.max(prob, 0), 1); // valor entre 0 e 1
+    return Math.min(Math.max(prob, 0), 1);
+}
+
+// --- Nova função para odds de gols ---
+function probImplícitaOdd(odd) {
+    return 1 / odd;
+}
+
+function probOverXComOdds(lambdaA, lambdaB, x, odd) {
+    const probPoisson = probOverX(lambdaA, lambdaB, x);
+    const probOdd = probImplícitaOdd(odd);
+    const probFinal = probPoisson * 0.7 + probOdd * 0.3;
+    return Math.min(Math.max(probFinal, 0), 1);
 }
 
 function pegarValoresClasse(classe) {
     return Array.from(document.querySelectorAll(`.${classe}`)).map(input => parseFloat(input.value) || 0);
 }
 
-// --- Sugestões combinadas com EV ---
+// --- Sugestões combinadas ---
 function gerarSugestoesCombinadas(probsOdds, probMais25, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35) {
     const dcSegura = probsOdds.dcAouEmpate;
     const evSegura = (dcSegura * oddMais25) - 1;
@@ -81,14 +97,16 @@ function gerarSugestoesCombinadas(probsOdds, probMais25, probMais15, probMenos35
     const evMais15Alt = (dcAlternativa * oddMais15) - 1;
     const evMenos35Alt = (dcAlternativa * oddMenos35) - 1;
 
-    const probSeguraFinal = dcSegura * probMais25;
-    const probMais15Final = dcAlternativa * probMais15;
-    const probMenos35Final = dcAlternativa * probMenos35;
+    function faixa(prob) {
+        if (prob > 0.65) return "Alta confiança";
+        if (prob > 0.55) return "Média confiança";
+        return "Baixa confiança";
+    }
 
     return [
-        `Sugestão combinada segura: Time A ou Empate + +2.5 gols → ${(probSeguraFinal * 100).toFixed(1)}% | EV: ${evSegura.toFixed(2)}`,
-        `Sugestão combinada alternativa: Time A ou Time B + +1.5 gols → ${(probMais15Final * 100).toFixed(1)}% | EV: ${evMais15Alt.toFixed(2)}`,
-        `Sugestão combinada alternativa: Time A ou Time B + -3.5 gols → ${(probMenos35Final * 100).toFixed(1)}% | EV: ${evMenos35Alt.toFixed(2)}`
+        `Sugestão combinada segura: Time A ou Empate + +2.5 gols → ${(probMais25 * 100).toFixed(1)}% | EV: ${evSegura.toFixed(2)} | ${faixa(probMais25)}`,
+        `Sugestão combinada alternativa: Time A ou Time B + +1.5 gols → ${(probMais15 * 100).toFixed(1)}% | EV: ${evMais15Alt.toFixed(2)} | ${faixa(probMais15)}`,
+        `Sugestão combinada alternativa: Time A ou Time B + -3.5 gols → ${(probMenos35 * 100).toFixed(1)}% | EV: ${evMenos35Alt.toFixed(2)} | ${faixa(probMenos35)}`
     ];
 }
 
@@ -119,10 +137,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const probBTTS = calcularProbBTTS(gA, sA, gB, sB, cdA, cdB);
         const probNaoBTTS = calcularProbNaoBTTS(probBTTS);
 
-        const mediaGolsA = calcularMedia(gA);
-        const mediaSofridosA = calcularMedia(sA);
-        const mediaGolsB = calcularMedia(gB);
-        const mediaSofridosB = calcularMedia(sB);
+        const mediaGolsA = calcularMediaPonderada(gA, Array(gA.length).fill(1).map((_, i) => i + 1));
+        const mediaSofridosA = calcularMediaPonderada(sA, Array(sA.length).fill(1).map((_, i) => i + 1));
+        const mediaGolsB = calcularMediaPonderada(gB, Array(gB.length).fill(1).map((_, i) => i + 1));
+        const mediaSofridosB = calcularMediaPonderada(sB, Array(sB.length).fill(1).map((_, i) => i + 1));
 
         const lambdaA = (mediaGolsA + mediaSofridosB) / 2;
         const lambdaB = (mediaGolsB + mediaSofridosA) / 2;
@@ -131,9 +149,9 @@ document.addEventListener('DOMContentLoaded', () => {
             probBTTS,
             probNaoBTTS,
             probsOdds,
-            probMais2_5: probOverX(lambdaA, lambdaB, 2),
-            probMais15: probOverX(lambdaA, lambdaB, 1.5),
-            probMenos35: 1 - probOverX(lambdaA, lambdaB, 3.5),
+            probMais2_5: probOverXComOdds(lambdaA, lambdaB, 2, oddMais25),
+            probMais15: probOverXComOdds(lambdaA, lambdaB, 1.5, oddMais15),
+            probMenos35: 1 - probOverXComOdds(lambdaA, lambdaB, 3.5, oddMenos35),
             mediaGolsA,
             mediaSofridosA,
             mediaGolsB,
@@ -145,12 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function gerarSugestoes(prob) {
-        const { probBTTS, probsOdds, probMais2_5, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35 } = prob;
+        const { probBTTS, probsOdds, probMais2_5, probMais15, probMenos35 } = prob;
         const sugestaoBTTS = probBTTS >= 60 ? "Boa chance de ambos os times marcarem (BTTS)." :
             probBTTS >= 40 ? "Probabilidade moderada para BTTS." :
                 "Baixa chance de ambos os times marcarem.";
 
-        const sugestaoCombinada = gerarSugestoesCombinadas(probsOdds, probMais2_5, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35);
+        const sugestaoCombinada = gerarSugestoesCombinadas(probsOdds, probMais2_5, probMais15, probMenos35, probMais2_5, probMais15, probMenos35);
 
         const opcoesDC = [
             { tipo: 'Time A ou Empate', score: probsOdds.dcAouEmpate },
@@ -177,7 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         resultadoDiv.innerHTML = `
 ### Estimativa de Placar Provável
-O jogo tende a ser equilibrado, com chances de:
 🟢 Time A marcar cerca de <strong>${estimativaA} gols</strong>
 🔴 Time B marcar cerca de <strong>${estimativaB} gols</strong>
 
@@ -222,6 +239,8 @@ Sugestão combinada:<br>${sugestaoCombinadaHTML}
         exibirResultado(prob, sug);
     });
 });
+
+
 
 
 
