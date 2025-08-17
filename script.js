@@ -65,7 +65,7 @@ function probOverX(lambdaA, lambdaB, x) {
             if (golsA + golsB > x) prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
         }
     }
-    return Math.min(Math.max(prob, 0), 1); // valor entre 0 e 1
+    return Math.min(Math.max(prob, 0), 1);
 }
 
 function pegarValoresClasse(classe) {
@@ -107,9 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const cdA = pegarValoresClasse('cd_gols_timeA');
         const cdB = pegarValoresClasse('cd_gols_timeB');
 
-        const oddA = parseFloat(document.getElementById('odd_vitoriaA').value) || 0;
-        const oddE = parseFloat(document.getElementById('odd_empate').value) || 0;
-        const oddB = parseFloat(document.getElementById('odd_vitoriaB').value) || 0;
+        const oddA = parseFloat(document.getElementById('odd_vitoriaA').value) || 1;
+        const oddE = parseFloat(document.getElementById('odd_empate').value) || 1;
+        const oddB = parseFloat(document.getElementById('odd_vitoriaB').value) || 1;
 
         const oddMais25 = parseFloat(document.getElementById('odd_mais25').value) || 2.0;
         const oddMais15 = parseFloat(document.getElementById('odd_mais15').value) || 1.5;
@@ -222,6 +222,9 @@ Sugestão combinada:<br>${sugestaoCombinadaHTML}
         exibirResultado(prob, sug);
     });
 });
+
+
+
 
 
 
