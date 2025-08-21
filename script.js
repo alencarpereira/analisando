@@ -110,60 +110,35 @@ function calcularEVDuplaChance(probDC, oddDC) {
     return (probDC * oddDC) - 1;
 }
 
-function gerarSugestoesDCComEV(probsOdds, oddVitoriaA, oddEmpate, oddVitoriaB) {
+// --- Sugestões automáticas ---
+function gerarSugestoesAutomatica(prob) {
+    const { probsOdds, probBTTS, probMais2_5, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35 } = prob;
+
     const opcoesDC = [
-        { tipo: 'Time A ou Empate', score: probsOdds.dcAouEmpate, odd: oddVitoriaA + oddEmpate },
-        { tipo: 'Time B ou Empate', score: probsOdds.dcBouEmpate, odd: oddVitoriaB + oddEmpate },
-        { tipo: 'Time A ou Time B', score: probsOdds.dcAouB, odd: oddVitoriaA + oddVitoriaB }
+        { tipo: 'Time A ou Empate', prob: probsOdds.dcAouEmpate, odd: oddMais25 },
+        { tipo: 'Time B ou Empate', prob: probsOdds.dcBouEmpate, odd: oddMais25 },
+        { tipo: 'Time A ou Time B', prob: probsOdds.dcAouB, odd: oddMais25 }
+    ];
+    opcoesDC.forEach(op => op.ev = (op.prob * op.odd) - 1);
+
+    const sugestoesOU = [
+        { tipo: 'Ambos Marcam (BTTS)', prob: probBTTS / 100, ev: 0.8 },
+        { tipo: 'Mais de 2.5 gols', prob: probMais2_5, ev: 0.8 },
+        { tipo: 'Mais de 1.5 gols', prob: probMais15, ev: 0.45 },
+        { tipo: 'Menos de 3.5 gols', prob: probMenos35, ev: -0.21 },
+        { tipo: 'Ambos NÃO Marcam', prob: 1 - probBTTS / 100, ev: -0.91 }
     ];
 
-    opcoesDC.forEach(op => {
-        op.ev = calcularEVDuplaChance(op.score, op.odd);
-        if (op.ev < 0) op.cor = 'red';
-        else if (op.ev < 0.2) op.cor = 'orange';
-        else op.cor = 'green';
-    });
-
-    opcoesDC.sort((a, b) => b.score - a.score);
-    return opcoesDC;
+    return [...opcoesDC, ...sugestoesOU];
 }
 
-// --- Sugestões combinadas com EV ajustadas ---
-function gerarSugestoesCombinadas(probsOdds, probMais25, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35) {
-    const dcSegura = probsOdds.dcAouEmpate;
-    const dcAlt = probsOdds.dcAouB;
-
-    const probSeguraFinal = Math.min(dcSegura * probMais25, 1);
-    const probMais15Final = Math.min(dcAlt * probMais15, 1);
-    const probMenos35Final = Math.min(dcAlt * probMenos35, 1);
-
-    const evSegura = (probSeguraFinal * oddMais25) - 1;
-    const evMais15Alt = (probMais15Final * oddMais15) - 1;
-    const evMenos35Alt = (probMenos35Final * oddMenos35) - 1;
-
-    function formatarSugestao(texto, ev, destaque = false) {
-        let cor = '';
-        if (ev < 0) cor = 'red';
-        else if (ev < 0.2) cor = 'orange';
-        else cor = 'green';
-        if (destaque) cor = 'blue'; // Destaca a melhor sugestão
-        return `<span style="color:${cor}">${texto} | EV: ${ev.toFixed(2)}</span>`;
+// --- Sugestão Principal ---
+function determinarSugestaoPrincipal(sugestoes) {
+    const sugestoesValidas = sugestoes.filter(s => s.ev > 0);
+    if (sugestoesValidas.length === 0) {
+        return sugestoes.reduce((max, s) => s.ev > max.ev ? s : max, sugestoes[0]);
     }
-
-    // Definindo a melhor sugestão com base em probabilidade >=50% e EV positivo
-    const sugestoes = [
-        { texto: `Sugestão combinada segura: Time A ou Empate + +2.5 gols → ${(probSeguraFinal * 100).toFixed(1)}%`, ev: evSegura },
-        { texto: `Sugestão combinada alternativa: Time A ou Time B + +1.5 gols → ${(probMais15Final * 100).toFixed(1)}%`, ev: evMais15Alt },
-        { texto: `Sugestão combinada alternativa: Time A ou Time B + -3.5 gols → ${(probMenos35Final * 100).toFixed(1)}%`, ev: evMenos35Alt }
-    ];
-
-    let melhor = sugestoes.reduce((prev, curr) => {
-        const scorePrev = (prev.ev > 0 && parseFloat(prev.texto.match(/→ (\d+\.?\d*)%/)[1]) >= 50) ? prev.ev : -Infinity;
-        const scoreCurr = (curr.ev > 0 && parseFloat(curr.texto.match(/→ (\d+\.?\d*)%/)[1]) >= 50) ? curr.ev : -Infinity;
-        return scoreCurr > scorePrev ? curr : prev;
-    });
-
-    return sugestoes.map(sug => formatarSugestao(sug.texto, sug.ev, sug === melhor));
+    return sugestoesValidas.reduce((max, s) => s.prob > max.prob ? s : max, sugestoesValidas[0]);
 }
 
 // --- DOM e eventos ---
@@ -197,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         const probBTTS = calcularProbBTTS(gA, sA, gB, sB, cdA, cdB);
-        const probNaoBTTS = calcularProbNaoBTTS(probBTTS);
 
         const mediaGolsA = calcularMedia(gA);
         const mediaSofridosA = calcularMedia(sA);
@@ -208,9 +182,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const lambdaB = (mediaGolsB + mediaSofridosA) / 2;
 
         return {
-            probBTTS,
-            probNaoBTTS,
             probsOdds,
+            probBTTS,
             probMais2_5: probOverX(lambdaA, lambdaB, 2),
             probMais15: probOverX(lambdaA, lambdaB, 1.5),
             probMenos35: 1 - probOverX(lambdaA, lambdaB, 3.5),
@@ -218,70 +191,65 @@ document.addEventListener('DOMContentLoaded', () => {
             mediaSofridosA,
             mediaGolsB,
             mediaSofridosB,
+            odd_vitoriaA: oddA,
+            odd_empate: oddE,
+            odd_vitoriaB: oddB,
             oddMais25,
             oddMais15,
             oddMenos35
         };
     }
 
-    function gerarSugestoes(prob) {
-        const { probBTTS, probsOdds, probMais2_5, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35 } = prob;
-
-        const sugestaoBTTS = probBTTS >= 60 ? "Boa chance de ambos os times marcarem (BTTS)." :
-            probBTTS >= 40 ? "Probabilidade moderada para BTTS." :
-                "Baixa chance de ambos os times marcarem.";
-
-        const sugestaoCombinada = gerarSugestoesCombinadas(probsOdds, probMais2_5, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35);
-
-        const opcoesDC = gerarSugestoesDCComEV(probsOdds,
-            parseFloat(document.getElementById('odd_vitoriaA').value),
-            parseFloat(document.getElementById('odd_empate').value),
-            parseFloat(document.getElementById('odd_vitoriaB').value)
-        );
-
-        const melhorDC = opcoesDC[0];
-
-        return { sugestaoBTTS, sugestaoDC: melhorDC, sugestaoCombinada };
-    }
-
-    function exibirResultado(prob, sug) {
-        const { mediaGolsA, mediaSofridosA, mediaGolsB, mediaSofridosB, probBTTS, probNaoBTTS, probMais2_5, probMais15, probMenos35 } = prob;
-        const { sugestaoBTTS, sugestaoDC, sugestaoCombinada } = sug;
-
-        const freqA = calcularFrequenciaResultados(pegarValoresClasse('timeA_gols_marcados'), pegarValoresClasse('timeA_gols_sofridos'));
-        const freqB = calcularFrequenciaResultados(pegarValoresClasse('timeB_gols_marcados'), pegarValoresClasse('timeB_gols_sofridos'));
-
+    // --- Gerar HTML das sugestões com nova ordem ---
+    function exibirResultado(prob) {
+        const { mediaGolsA, mediaSofridosA, mediaGolsB, mediaSofridosB } = prob;
         const estimativaA = ((mediaGolsA + mediaSofridosB) / 2).toFixed(1);
         const estimativaB = ((mediaGolsB + mediaSofridosA) / 2).toFixed(1);
+
+        const sugestoesAuto = gerarSugestoesAutomatica(prob);
+        const sugestaoPrincipal = determinarSugestaoPrincipal(sugestoesAuto);
+
+        // Reordenar as sugestões manualmente
+        const ordemNova = [
+            'Time A ou Empate',
+            'Time B ou Empate',
+            'Time A ou Time B',
+            'Mais de 1.5 gols',
+            'Mais de 2.5 gols',
+            'Menos de 3.5 gols',
+            'Ambos Marcam (BTTS)',
+            'Ambos NÃO Marcam'
+        ];
+        const sugestoesOrdenadas = ordemNova.map(nome => sugestoesAuto.find(s => s.tipo === nome));
+
+        const sugestoesHTML = sugestoesOrdenadas.map(s => {
+            let cor = s.ev < 0 ? '#f44336' : s.ev < 0.2 ? '#ff9800' : '#4caf50';
+            return `${s.tipo} | Prob: ${(s.prob * 100).toFixed(1)}% | EV: ${s.ev.toFixed(2)} <span style="color:${cor}">●</span>`;
+        }).join('<br>');
 
         resultadoDiv.innerHTML = `
 ### Estimativa de Placar Provável
 🟢 Time A marcar cerca de <strong>${estimativaA} gols</strong>
 🔴 Time B marcar cerca de <strong>${estimativaB} gols</strong>
 
-Probabilidade aproximada de "Ambos os Times Marcam (BTTS)": ${probBTTS.toFixed(2)}%
-Probabilidade aproximada de "Ambos os Times NÃO Marcam": ${probNaoBTTS.toFixed(2)}%
-
-Probabilidade aproximada de Over/Under:
-- Mais de 2.5 gols: ${(probMais2_5 * 100).toFixed(2)}%
-- Mais de 1.5 gols: ${(probMais15 * 100).toFixed(2)}%
-- Menos de 3.5 gols: ${(probMenos35 * 100).toFixed(2)}%
-
 Resumo Ofensivo e Defensivo:
-- Time A: Média gols marcados ${mediaGolsA.toFixed(2)}, gols sofridos ${mediaSofridosA.toFixed(2)}, V/E/D: ${freqA.v}/${freqA.e}/${freqA.d}
-- Time B: Média gols marcados ${mediaGolsB.toFixed(2)}, gols sofridos ${mediaSofridosB.toFixed(2)}, V/E/D: ${freqB.v}/${freqB.e}/${freqB.d}
+- Time A: Média gols marcados ${mediaGolsA.toFixed(2)}, gols sofridos ${mediaSofridosA.toFixed(2)}
+- Time B: Média gols marcados ${mediaGolsB.toFixed(2)}, gols sofridos ${mediaSofridosB.toFixed(2)}
 
-Sugestão de aposta BTTS: <strong>${sugestaoBTTS}</strong><br>
-Sugestão Dupla Chance: <strong style="color:${sugestaoDC.cor}">${sugestaoDC.tipo} | EV: ${sugestaoDC.ev.toFixed(2)}</strong><br>
-Sugestão combinada:<br>${sugestaoCombinada.join('<br>')}
-        `;
+Sugestões automáticas de apostas:
+${sugestoesHTML}
+
+<br><br>
+### Sugestão Principal
+<b style="color:blue">${sugestaoPrincipal.tipo}</b> | Prob: ${(sugestaoPrincipal.prob * 100).toFixed(1)}% | EV: ${sugestaoPrincipal.ev.toFixed(2)}
+    `;
     }
+
 
     form.addEventListener('submit', e => {
         e.preventDefault();
         const prob = calcularProbabilidades();
-        const sug = gerarSugestoes(prob);
-        exibirResultado(prob, sug);
+        exibirResultado(prob);
     });
 
     btnLimpar.addEventListener('click', () => {
@@ -290,21 +258,20 @@ Sugestão combinada:<br>${sugestaoCombinada.join('<br>')}
     });
 
     btnPreencher.addEventListener('click', () => {
-        // Preenche todos os inputs numéricos do form
         form.querySelectorAll('input[type="number"]').forEach(input => {
-            // Odds recebem valores fixos padrão
             if (input.id === 'odd_vitoriaA') input.value = 1.8;
             else if (input.id === 'odd_empate') input.value = 3.2;
             else if (input.id === 'odd_vitoriaB') input.value = 4.0;
             else if (input.id === 'odd_mais25') input.value = 2.0;
             else if (input.id === 'odd_mais15') input.value = 1.5;
             else if (input.id === 'odd_menos35') input.value = 3.5;
-            // Todos os outros inputs (gols) recebem valores aleatórios entre 1 e 4
             else input.value = Math.floor(Math.random() * 4) + 1;
         });
     });
 
 });
+
+
 
 
 
