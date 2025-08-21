@@ -1,3 +1,10 @@
+// --- Constantes do programa ---
+const MAX_BTTS = 25;        // escala BTTS
+const MIN_BTTS = 5;
+const MAX_GOALS_POISSON = 10;
+const LIMITE_ESCANTEIOS = 6;
+const LIMITE_CARTOES = 1;
+
 // --- Funções auxiliares ---
 function calcularPesosOddsDuplaChance(oddVitoriaA, oddEmpate, oddVitoriaB) {
     const probVitoriaA = 1 / oddVitoriaA;
@@ -26,6 +33,35 @@ function calcularFrequenciaResultados(golsMarcados, golsSofridos) {
     return { v, e, d };
 }
 
+// --- Escanteios e Cartões ---
+function calcularProbabilidadesEscanteiosCartoes() {
+    const oddEscanteios = parseFloat(document.getElementById("odd_escanteios").value || 1);
+    const oddCartoes = parseFloat(document.getElementById("odd_cartoes").value || 1);
+
+    const timeA_escanteios = parseFloat(document.querySelector(".timeA_escanteios").value || 0);
+    const timeB_escanteios = parseFloat(document.querySelector(".timeB_escanteios").value || 0);
+    const timeA_cartoes = parseFloat(document.querySelector(".timeA_cartoes").value || 0);
+    const timeB_cartoes = parseFloat(document.querySelector(".timeB_cartoes").value || 0);
+
+    const mediaTotalEscanteios = timeA_escanteios + timeB_escanteios;
+    const mediaTotalCartoes = timeA_cartoes + timeB_cartoes;
+
+    // Ajuste: calcular probabilidade como função do total esperado em relação à odd
+    const probEscanteiosCasa = 1 / oddEscanteios;
+    const probCartoesCasa = 1 / oddCartoes;
+
+    let probFinalEscanteios = Math.min((mediaTotalEscanteios / (LIMITE_ESCANTEIOS * 2)) * probEscanteiosCasa * 1.5, 1);
+    let probFinalCartoes = Math.min((mediaTotalCartoes / (LIMITE_CARTOES * 2)) * probCartoesCasa * 1.5, 1);
+
+    return {
+        escanteios: probFinalEscanteios,
+        cartoes: probFinalCartoes,
+        limiteEscanteios: LIMITE_ESCANTEIOS,
+        limiteCartoes: LIMITE_CARTOES
+    };
+}
+
+// --- BTTS e gols ---
 function calcularProbBTTS(gA, sA, gB, sB, cdA, cdB) {
     const mediaGolsMarcadosA = calcularMedia(gA);
     const mediaGolsSofridosA = calcularMedia(sA);
@@ -47,21 +83,21 @@ function calcularProbBTTS(gA, sA, gB, sB, cdA, cdB) {
 
     const probTotal = (probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos);
 
-    return Math.min(Math.max(probTotal * 25, 5), 95);
+    return Math.min(Math.max(probTotal * MAX_BTTS, MIN_BTTS), 95);
 }
 
 function calcularProbNaoBTTS(probBTTS) {
     return 100 - probBTTS;
 }
 
+// --- Funções de Poisson ---
 function factorial(n) { if (n === 0) return 1; let f = 1; for (let i = 1; i <= n; i++) f *= i; return f; }
 function poisson(k, lambda) { return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k); }
 
 function probOverX(lambdaA, lambdaB, x) {
     let prob = 0;
-    const maxGols = 10;
-    for (let golsA = 0; golsA <= maxGols; golsA++) {
-        for (let golsB = 0; golsB <= maxGols; golsB++) {
+    for (let golsA = 0; golsA <= MAX_GOALS_POISSON; golsA++) {
+        for (let golsB = 0; golsB <= MAX_GOALS_POISSON; golsB++) {
             if (golsA + golsB > x) prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
         }
     }
@@ -72,7 +108,7 @@ function pegarValoresClasse(classe) {
     return Array.from(document.querySelectorAll(`.${classe}`)).map(input => parseFloat(input.value) || 0);
 }
 
-// --- Dupla Chance ajustada com histórico ---
+// --- Dupla Chance Ajustada ---
 function calcularDuplaChanceAjustada(oddVitoriaA, oddEmpate, oddVitoriaB, freqA, freqB, cdA, cdB) {
     const probVitoriaA = 1 / oddVitoriaA;
     const probEmpate = 1 / oddEmpate;
@@ -105,48 +141,44 @@ function calcularDuplaChanceAjustada(oddVitoriaA, oddEmpate, oddVitoriaB, freqA,
     return { dcAouEmpate, dcBouEmpate, dcAouB };
 }
 
-// --- EV Dupla Chance ---
-function calcularEVDuplaChance(probDC, oddDC) {
-    return (probDC * oddDC) - 1;
-}
-
-// --- Sugestões automáticas ---
-function gerarSugestoesAutomatica(prob) {
-    const { probsOdds, probBTTS, probMais2_5, probMais15, probMenos35, oddMais25, oddMais15, oddMenos35 } = prob;
-
-    const opcoesDC = [
-        { tipo: 'Time A ou Empate', prob: probsOdds.dcAouEmpate, odd: oddMais25 },
-        { tipo: 'Time B ou Empate', prob: probsOdds.dcBouEmpate, odd: oddMais25 },
-        { tipo: 'Time A ou Time B', prob: probsOdds.dcAouB, odd: oddMais25 }
-    ];
-    opcoesDC.forEach(op => op.ev = (op.prob * op.odd) - 1);
-
-    const sugestoesOU = [
-        { tipo: 'Ambos Marcam (BTTS)', prob: probBTTS / 100, ev: 0.8 },
-        { tipo: 'Mais de 2.5 gols', prob: probMais2_5, ev: 0.8 },
-        { tipo: 'Mais de 1.5 gols', prob: probMais15, ev: 0.45 },
-        { tipo: 'Menos de 3.5 gols', prob: probMenos35, ev: -0.21 },
-        { tipo: 'Ambos NÃO Marcam', prob: 1 - probBTTS / 100, ev: -0.91 }
-    ];
-
-    return [...opcoesDC, ...sugestoesOU];
-}
-
 // --- Sugestão Principal ---
 function determinarSugestaoPrincipal(sugestoes) {
-    const sugestoesValidas = sugestoes.filter(s => s.ev > 0);
-    if (sugestoesValidas.length === 0) {
-        return sugestoes.reduce((max, s) => s.ev > max.ev ? s : max, sugestoes[0]);
-    }
-    return sugestoesValidas.reduce((max, s) => s.prob > max.prob ? s : max, sugestoesValidas[0]);
+    const boas = sugestoes.filter(s => s.ev > 0);
+    boas.sort((a, b) => b.prob - a.prob);
+    return boas.slice(0, 3);
 }
+
+// --- Sugestões Automáticas ---
+function gerarSugestoesAutomatica(prob) {
+    const { probsOdds, probBTTS, probMais2_5, probMais15, probMenos35 } = prob;
+    const escCart = calcularProbabilidadesEscanteiosCartoes();
+
+    const oddMais15 = parseFloat(document.getElementById("odd_mais15").value || 1);
+    const oddMais25 = parseFloat(document.getElementById("odd_mais25").value || 1);
+    const oddMenos35 = parseFloat(document.getElementById("odd_menos35").value || 1);
+
+    const sugestoes = [
+        { tipo: 'Time A ou Empate', prob: probsOdds.dcAouEmpate, ev: (probsOdds.dcAouEmpate * 1.8) - 1 },
+        { tipo: 'Time B ou Empate', prob: probsOdds.dcBouEmpate, ev: (probsOdds.dcBouEmpate * 1.8) - 1 },
+        { tipo: 'Time A ou Time B', prob: probsOdds.dcAouB, ev: (probsOdds.dcAouB * 1.8) - 1 },
+        { tipo: 'Mais de 1.5 gols', prob: probMais15, ev: (probMais15 * oddMais15) - 1 },
+        { tipo: 'Mais de 2.5 gols', prob: probMais2_5, ev: (probMais2_5 * oddMais25) - 1 },
+        { tipo: 'Menos de 3.5 gols', prob: probMenos35, ev: (probMenos35 * oddMenos35) - 1 },
+        { tipo: 'Ambos Marcam (BTTS)', prob: probBTTS / 100, ev: (probBTTS / 100 * 1.8) - 1 },
+        { tipo: 'Ambos NÃO Marcam', prob: 1 - probBTTS / 100, ev: ((1 - probBTTS / 100) * 1.8) - 1 },
+        { tipo: `Mais de ${escCart.limiteEscanteios} Escanteios`, prob: escCart.escanteios, ev: (escCart.escanteios * 1.9) - 1 },
+        { tipo: `Mais de ${escCart.limiteCartoes} Cartão(ões)`, prob: escCart.cartoes, ev: (escCart.cartoes * 1.9) - 1 }
+    ];
+    return sugestoes;
+}
+
 
 // --- DOM e eventos ---
 document.addEventListener('DOMContentLoaded', () => {
-    const btnPreencher = document.getElementById('btnPreencher');
-    const btnLimpar = document.getElementById('btnLimpar');
     const form = document.getElementById('btForm');
     const resultadoDiv = document.getElementById('resultado');
+    const btnPreencher = document.getElementById('btnPreencher');
+    const btnLimpar = document.getElementById('btnLimpar');
 
     function calcularProbabilidades() {
         const gA = pegarValoresClasse('timeA_gols_marcados');
@@ -159,10 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const oddA = parseFloat(document.getElementById('odd_vitoriaA').value) || 1;
         const oddE = parseFloat(document.getElementById('odd_empate').value) || 1;
         const oddB = parseFloat(document.getElementById('odd_vitoriaB').value) || 1;
-
-        const oddMais25 = parseFloat(document.getElementById('odd_mais25').value) || 2.0;
-        const oddMais15 = parseFloat(document.getElementById('odd_mais15').value) || 1.5;
-        const oddMenos35 = parseFloat(document.getElementById('odd_menos35').value) || 3.5;
 
         const probsOdds = calcularDuplaChanceAjustada(
             oddA, oddE, oddB,
@@ -193,56 +221,102 @@ document.addEventListener('DOMContentLoaded', () => {
             mediaSofridosB,
             odd_vitoriaA: oddA,
             odd_empate: oddE,
-            odd_vitoriaB: oddB,
-            oddMais25,
-            oddMais15,
-            oddMenos35
+            odd_vitoriaB: oddB
         };
     }
 
-    // --- Gerar HTML das sugestões com nova ordem ---
     function exibirResultado(prob) {
-        const { mediaGolsA, mediaSofridosA, mediaGolsB, mediaSofridosB } = prob;
-        const estimativaA = ((mediaGolsA + mediaSofridosB) / 2).toFixed(1);
-        const estimativaB = ((mediaGolsB + mediaSofridosA) / 2).toFixed(1);
-
         const sugestoesAuto = gerarSugestoesAutomatica(prob);
         const sugestaoPrincipal = determinarSugestaoPrincipal(sugestoesAuto);
 
-        // Reordenar as sugestões manualmente
-        const ordemNova = [
-            'Time A ou Empate',
-            'Time B ou Empate',
-            'Time A ou Time B',
-            'Mais de 1.5 gols',
-            'Mais de 2.5 gols',
-            'Menos de 3.5 gols',
-            'Ambos Marcam (BTTS)',
-            'Ambos NÃO Marcam'
-        ];
-        const sugestoesOrdenadas = ordemNova.map(nome => sugestoesAuto.find(s => s.tipo === nome));
+        // Sugestão Principal
+        const sugestoesHTML = sugestaoPrincipal.map(s => {
+            let cor = s.ev < 0 ? '#f44336' : s.ev < 0.2 ? '#ff9800' : '#4caf50';
+            return `${s.tipo} | Prob: ${(s.prob * 100).toFixed(1)}% | EV: ${s.ev.toFixed(2)} <span style="color:${cor}">●</span>`;
+        }).join('<br>');
 
-        const sugestoesHTML = sugestoesOrdenadas.map(s => {
+        // Todas Sugestões
+        const todasSugestoesHTML = sugestoesAuto.map(s => {
             let cor = s.ev < 0 ? '#f44336' : s.ev < 0.2 ? '#ff9800' : '#4caf50';
             return `${s.tipo} | Prob: ${(s.prob * 100).toFixed(1)}% | EV: ${s.ev.toFixed(2)} <span style="color:${cor}">●</span>`;
         }).join('<br>');
 
         resultadoDiv.innerHTML = `
-### Estimativa de Placar Provável
-🟢 Time A marcar cerca de <strong>${estimativaA} gols</strong>
-🔴 Time B marcar cerca de <strong>${estimativaB} gols</strong>
-
-Resumo Ofensivo e Defensivo:
-- Time A: Média gols marcados ${mediaGolsA.toFixed(2)}, gols sofridos ${mediaSofridosA.toFixed(2)}
-- Time B: Média gols marcados ${mediaGolsB.toFixed(2)}, gols sofridos ${mediaSofridosB.toFixed(2)}
-
-Sugestões automáticas de apostas:
+<h3>Sugestões Principais</h3>
 ${sugestoesHTML}
-
-<br><br>
-### Sugestão Principal
-<b style="color:blue">${sugestaoPrincipal.tipo}</b> | Prob: ${(sugestaoPrincipal.prob * 100).toFixed(1)}% | EV: ${sugestaoPrincipal.ev.toFixed(2)}
+<hr>
+<h3>Todas Sugestões</h3>
+${todasSugestoesHTML}
+<div style="margin-top:20px;">
+    <canvas id="graficoEV" width="400" height="200"></canvas>
+</div>
     `;
+
+        // --- Gerar gráfico ---
+        const ctx = document.getElementById('graficoEV').getContext('2d');
+
+        // Ordena sugestões pelo EV (maior para menor)
+        const sugestoesOrdenadas = [...sugestoesAuto].sort((a, b) => b.ev - a.ev);
+        const top3 = sugestoesOrdenadas.slice(0, 3);
+
+        const labels = sugestoesAuto.map(s => s.tipo);
+        const probValues = sugestoesAuto.map(s => (s.prob * 100).toFixed(1));
+        const evValues = sugestoesAuto.map(s => s.ev.toFixed(2));
+
+        const barColors = sugestoesAuto.map(s => top3.includes(s) ? 'rgba(75, 192, 192, 0.7)' : 'rgba(200, 200, 200, 0.5)');
+        const probColors = sugestoesAuto.map(s => 'rgba(54, 162, 235, 0.5)');
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Probabilidade (%)',
+                        data: probValues,
+                        backgroundColor: probColors,
+                        yAxisID: 'y1',
+                    },
+                    {
+                        label: 'EV',
+                        data: evValues,
+                        backgroundColor: barColors,
+                        yAxisID: 'y2',
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y1: {
+                        type: 'linear',
+                        position: 'left',
+                        min: 0,
+                        max: 100,
+                        title: { display: true, text: 'Probabilidade (%)' }
+                    },
+                    y2: {
+                        type: 'linear',
+                        position: 'right',
+                        min: -1,
+                        max: 1,
+                        title: { display: true, text: 'EV' }
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const datasetLabel = context.dataset.label || '';
+                                const value = context.raw;
+                                return `${datasetLabel}: ${value}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
     }
 
 
@@ -265,11 +339,16 @@ ${sugestoesHTML}
             else if (input.id === 'odd_mais25') input.value = 2.0;
             else if (input.id === 'odd_mais15') input.value = 1.5;
             else if (input.id === 'odd_menos35') input.value = 3.5;
+            else if (input.id === 'odd_escanteios') input.value = 1.9;
+            else if (input.id === 'odd_cartoes') input.value = 1.9;
             else input.value = Math.floor(Math.random() * 4) + 1;
         });
     });
-
 });
+
+
+
+
 
 
 

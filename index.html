@@ -3,49 +3,45 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Análise BTTS com Médias Automáticas</title>
+    <title>Análise BTTS, Escanteios e Cartões</title>
     <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body>
-    <h1>Análise Ambos os Times Marcam (BTTS)</h1>
+    <h1>Análise Futebol: BTTS, Escanteios e Cartões</h1>
 
     <form id="btForm">
 
+        <!-- Odds da Casa -->
         <fieldset>
             <legend>Odds da Casa de Aposta</legend>
-
             <div class="jogo-group">
                 <label for="odd_vitoriaA">Odd Vitória Time A:</label>
                 <input id="odd_vitoriaA" type="number" step="0.01" min="1" required />
             </div>
-
             <div class="jogo-group">
                 <label for="odd_empate">Odd Empate:</label>
                 <input id="odd_empate" type="number" step="0.01" min="1" required />
             </div>
-
             <div class="jogo-group">
                 <label for="odd_vitoriaB">Odd Vitória Time B:</label>
                 <input id="odd_vitoriaB" type="number" step="0.01" min="1" required />
             </div>
-
             <div class="jogo-group">
                 <label for="odd_mais25">Odd +2.5 Gols:</label>
                 <input id="odd_mais25" type="number" step="0.01" min="1" required />
             </div>
-
             <div class="jogo-group">
                 <label for="odd_mais15">Odd +1.5 Gols:</label>
                 <input id="odd_mais15" type="number" step="0.01" min="1" required />
             </div>
-
             <div class="jogo-group">
                 <label for="odd_menos35">Odd -3.5 Gols:</label>
                 <input id="odd_menos35" type="number" step="0.01" min="1" required />
             </div>
         </fieldset>
 
+        <!-- Últimos 5 confrontos diretos -->
         <fieldset>
             <legend>Últimos 5 Confrontos Diretos</legend>
             <div class="jogo-group">
@@ -80,6 +76,7 @@
             </div>
         </fieldset>
 
+        <!-- Dados Time A -->
         <fieldset>
             <legend>Dados Time A (últimos 5 jogos)</legend>
             <div class="jogo-group">
@@ -114,6 +111,7 @@
             </div>
         </fieldset>
 
+        <!-- Dados Time B -->
         <fieldset>
             <legend>Dados Time B (últimos 5 jogos)</legend>
             <div class="jogo-group">
@@ -148,15 +146,44 @@
             </div>
         </fieldset>
 
+        <!-- Escanteios e Cartões -->
+        <fieldset>
+            <legend>Escanteios e Cartões</legend>
+            <div class="jogo-group">
+                <label>Time A - Média Escanteios:</label>
+                <input type="number" class="timeA_escanteios" step="0.1" min="0" required />
+                <label>Time B - Média Escanteios:</label>
+                <input type="number" class="timeB_escanteios" step="0.1" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Time A - Média Cartões:</label>
+                <input type="number" class="timeA_cartoes" step="0.1" min="0" required />
+                <label>Time B - Média Cartões:</label>
+                <input type="number" class="timeB_cartoes" step="0.1" min="0" required />
+            </div>
+            <div class="jogo-group">
+                <label>Odd Escanteios:</label>
+                <input id="odd_escanteios" type="number" step="0.01" min="1" required />
+                <label>Odd Cartões:</label>
+                <input id="odd_cartoes" type="number" step="0.01" min="1" required />
+            </div>
+        </fieldset>
+
         <div class="botoes-container">
             <button id="btnPreencher" type="button">Preencher Automaticamente</button>
             <button id="btnLimpar" type="button">Limpar</button>
-            <button type="submit">Calcular Probabilidade BTTS</button>
+            <button type="submit">Calcular Probabilidades</button>
         </div>
 
     </form>
 
     <div id="resultado"></div>
+
+    <div id="graficoContainer">
+        <canvas id="graficoEV" width="400" height="200"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script src="script.js"></script>
 </body>
