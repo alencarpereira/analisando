@@ -130,9 +130,9 @@ function calcularDuplaChanceAjustada(oddVitoriaA, oddEmpate, oddVitoriaB, freqA,
     const histCD_BouE = (freqCD.d + freqCD.e * 0.5) / totalCD;
     const histCD_AouB = (freqCD.v + freqCD.d) / totalCD;
 
-    const pesoOdds = 0.4;
-    const pesoHistorico = 0.4;
-    const pesoCD = 0.2;
+    const pesoOdds = 0.2;
+    const pesoHistorico = 0.5;
+    const pesoCD = 0.3;
 
     const dcAouEmpate = Math.min((pesoOdds * (oddsA + oddsE)) + (pesoHistorico * histA) + (pesoCD * histCD_AouE), 1);
     const dcBouEmpate = Math.min((pesoOdds * (oddsB + oddsE)) + (pesoHistorico * histB) + (pesoCD * histCD_BouE), 1);
