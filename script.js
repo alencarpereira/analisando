@@ -3,7 +3,7 @@ const MAX_BTTS = 25;        // escala BTTS
 const MIN_BTTS = 5;
 const MAX_GOALS_POISSON = 10;
 const LIMITE_ESCANTEIOS = 6;
-const LIMITE_CARTOES = 1;
+const LIMITE_CARTOES = 4.5;
 
 // --- Funções auxiliares ---
 function calcularPesosOddsDuplaChance(oddVitoriaA, oddEmpate, oddVitoriaB) {
@@ -38,15 +38,15 @@ function calcularProbabilidadesEscanteiosCartoes() {
     const oddEscanteios = parseFloat(document.getElementById("odd_escanteios").value || 1);
     const oddCartoes = parseFloat(document.getElementById("odd_cartoes").value || 1);
 
-    const timeA_escanteios = parseFloat(document.querySelector(".timeA_escanteios").value || 0);
-    const timeB_escanteios = parseFloat(document.querySelector(".timeB_escanteios").value || 0);
-    const timeA_cartoes = parseFloat(document.querySelector(".timeA_cartoes").value || 0);
-    const timeB_cartoes = parseFloat(document.querySelector(".timeB_cartoes").value || 0);
+    // ✅ Garantindo que 0 é aceito como valor válido
+    const timeA_escanteios = parseFloat(document.querySelector(".timeA_escanteios").value) || 0;
+    const timeB_escanteios = parseFloat(document.querySelector(".timeB_escanteios").value) || 0;
+    const timeA_cartoes = parseFloat(document.querySelector(".timeA_cartoes").value) || 0;
+    const timeB_cartoes = parseFloat(document.querySelector(".timeB_cartoes").value) || 0;
 
     const mediaTotalEscanteios = timeA_escanteios + timeB_escanteios;
     const mediaTotalCartoes = timeA_cartoes + timeB_cartoes;
 
-    // Ajuste: calcular probabilidade como função do total esperado em relação à odd
     const probEscanteiosCasa = 1 / oddEscanteios;
     const probCartoesCasa = 1 / oddCartoes;
 
@@ -172,7 +172,6 @@ function gerarSugestoesAutomatica(prob) {
     return sugestoes;
 }
 
-
 // --- DOM e eventos ---
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('btForm');
@@ -255,7 +254,6 @@ ${todasSugestoesHTML}
         // --- Gerar gráfico ---
         const ctx = document.getElementById('graficoEV').getContext('2d');
 
-        // Ordena sugestões pelo EV (maior para menor)
         const sugestoesOrdenadas = [...sugestoesAuto].sort((a, b) => b.ev - a.ev);
         const top3 = sugestoesOrdenadas.slice(0, 3);
 
@@ -318,7 +316,6 @@ ${todasSugestoesHTML}
             }
         });
     }
-
 
     form.addEventListener('submit', e => {
         e.preventDefault();
