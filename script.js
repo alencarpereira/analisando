@@ -78,11 +78,15 @@ function calcularProbBTTS(gA, sA, gB, sB, cdA, cdB) {
     const pesoResultados = 0.3;
     const pesoConfrontos = 0.1;
 
-    return Math.min(Math.max((probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos), 0), 1);
+    let resultado = (probGeral * pesoMedias) + (ajusteResultados * pesoResultados) + (probCD * pesoConfrontos);
+    if (resultado > 0.95) resultado = 0.95;
+    return Math.min(Math.max(resultado, 0), 1);
 }
 
 // --- Dupla Chance Ajustada ---
+// --- Dupla Chance Ajustada (corrigida) ---
 function calcularDuplaChanceAjustada(oddVitoriaA, oddEmpate, oddVitoriaB, freqA, freqB, cdA, cdB) {
+    // Probabilidades implícitas da casa
     const probVitoriaA = 1 / oddVitoriaA;
     const probEmpate = 1 / oddEmpate;
     const probVitoriaB = 1 / oddVitoriaB;
@@ -92,58 +96,105 @@ function calcularDuplaChanceAjustada(oddVitoriaA, oddEmpate, oddVitoriaB, freqA,
     const oddsE = probEmpate / somaProbs;
     const oddsB = probVitoriaB / somaProbs;
 
+    // Frequência histórica dos times
     const totalA = freqA.v + freqA.e + freqA.d;
     const totalB = freqB.v + freqB.e + freqB.d;
     const histA = (freqA.v + freqA.e * 0.5) / totalA;
     const histB = (freqB.v + freqB.e * 0.5) / totalB;
 
+    // Confrontos diretos
     const freqCD = calcularFrequenciaResultados(cdA, cdB);
     const totalCD = freqCD.v + freqCD.e + freqCD.d;
     const histCD_AouE = (freqCD.v + freqCD.e * 0.5) / totalCD;
     const histCD_BouE = (freqCD.d + freqCD.e * 0.5) / totalCD;
     const histCD_AouB = (freqCD.v + freqCD.d) / totalCD;
 
+    // Pesos
     const pesoOdds = 0.2;
     const pesoHistorico = 0.5;
     const pesoCD = 0.3;
 
-    return {
-        dcAouEmpate: Math.min((pesoOdds * (oddsA + oddsE)) + (pesoHistorico * histA) + (pesoCD * histCD_AouE), 1),
-        dcBouEmpate: Math.min((pesoOdds * (oddsB + oddsE)) + (pesoHistorico * histB) + (pesoCD * histCD_BouE), 1),
-        dcAouB: Math.min((pesoOdds * (oddsA + oddsB)) + (pesoHistorico * ((histA + histB) / 2)) + (pesoCD * histCD_AouB), 1)
-    };
+    // Probabilidades finais ajustadas
+    const dcAouEmpate = Math.min((pesoOdds * (oddsA + oddsE)) + (pesoHistorico * histA) + (pesoCD * histCD_AouE), 1);
+    const dcBouEmpate = Math.min((pesoOdds * (oddsB + oddsE)) + (pesoHistorico * histB) + (pesoCD * histCD_BouE), 1);
+    const dcAouB = Math.min((pesoOdds * (oddsA + oddsB)) + (pesoHistorico * ((histA + histB) / 2)) + (pesoCD * histCD_AouB), 1);
+
+    // Retorna apenas combinações válidas
+    return { dcAouEmpate, dcBouEmpate, dcAouB };
 }
 
-// --- Gerar todas apostas e destacar a mais recomendada ---
+
+// --- Funções de Probabilidade Poisson ---
+function factorial(n) { if (n === 0) return 1; let f = 1; for (let i = 1; i <= n; i++) f *= i; return f; }
+function poisson(k, lambda) { return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k); }
+function probOverX(lambdaA, lambdaB, x) {
+    let prob = 0;
+    for (let golsA = 0; golsA <= MAX_GOALS_POISSON; golsA++) {
+        for (let golsB = 0; golsB <= MAX_GOALS_POISSON; golsB++) {
+            if (golsA + golsB > x) prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
+        }
+    }
+    return Math.min(Math.max(prob, 0), 1);
+}
+
+// --- Gerar todas apostas e destaque ---
 function gerarSugestoesComDestaque(prob) {
     const { probsOdds, probBTTS, probMais2_5, probMais15, probMenos35 } = prob;
     const escCart = calcularProbabilidadesEscanteiosCartoes();
+
     const oddEV = pegarFloat("odd_vitoriaA");
     const oddMais15 = pegarFloat("odd_mais15");
     const oddMais25 = pegarFloat("odd_mais25");
     const oddMenos35 = pegarFloat("odd_menos35");
 
-    const apostas = [
-        { tipo: 'Ambos Marcam (BTTS)', prob: probBTTS, ev: (probBTTS * oddEV) - 1 },
-        { tipo: 'Time A ou Empate', prob: probsOdds.dcAouEmpate, ev: (probsOdds.dcAouEmpate * oddEV) - 1 },
-        { tipo: 'Time B ou Empate', prob: probsOdds.dcBouEmpate, ev: (probsOdds.dcBouEmpate * oddEV) - 1 },
-        { tipo: 'Time A ou Time B', prob: probsOdds.dcAouB, ev: (probsOdds.dcAouB * oddEV) - 1 },
-        { tipo: 'Mais de 1.5 gols', prob: probMais15, ev: (probMais15 * oddMais15) - 1 },
-        { tipo: 'Mais de 2.5 gols', prob: probMais2_5, ev: (probMais2_5 * oddMais25) - 1 },
-        { tipo: 'Menos de 3.5 gols', prob: probMenos35, ev: (probMenos35 * oddMenos35) - 1 },
-        { tipo: `Mais de ${escCart.limiteEscanteios} Escanteios`, prob: escCart.escanteios, ev: (escCart.escanteios * oddMais25) - 1 },
-        { tipo: `Mais de ${escCart.limiteCartoes} Cartão(ões)`, prob: escCart.cartoes, ev: (escCart.cartoes * oddMais25) - 1 }
+    // --- Apostas individuais ---
+    let apostas = [
+        { categoria: "Gols", tipo: 'Ambos Marcam (BTTS)', prob: probBTTS, ev: (probBTTS * oddEV) - 1 },
+        { categoria: "Dupla Chance", tipo: 'Time A ou Empate', prob: probsOdds.dcAouEmpate, ev: (probsOdds.dcAouEmpate * oddEV) - 1 },
+        { categoria: "Dupla Chance", tipo: 'Time B ou Empate', prob: probsOdds.dcBouEmpate, ev: (probsOdds.dcBouEmpate * oddEV) - 1 },
+        { categoria: "Dupla Chance", tipo: 'Time A ou Time B', prob: probsOdds.dcAouB, ev: (probsOdds.dcAouB * oddEV) - 1 },
+        { categoria: "Gols", tipo: 'Mais de 1.5 gols', prob: probMais15, ev: (probMais15 * oddMais15) - 1 },
+        { categoria: "Gols", tipo: 'Mais de 2.5 gols', prob: probMais2_5, ev: (probMais2_5 * oddMais25) - 1 },
+        { categoria: "Gols", tipo: 'Menos de 3.5 gols', prob: probMenos35, ev: (probMenos35 * oddMenos35) - 1 },
+        { categoria: "Escanteios/Cartões", tipo: `Mais de ${escCart.limiteEscanteios} Escanteios`, prob: escCart.escanteios, ev: (escCart.escanteios * oddMais25) - 1 },
+        { categoria: "Escanteios/Cartões", tipo: `Mais de ${escCart.limiteCartoes} Cartão(ões)`, prob: escCart.cartoes, ev: (escCart.cartoes * oddMais25) - 1 }
     ];
 
-    // Encontrar a mais recomendada (maior probabilidade)
-    const recomendada = apostas.reduce((a, b) => b.prob > a.prob ? b : a);
-    const apostaSalva = { ...recomendada, data: new Date().toLocaleString(), resultado: "" };
-    historicoApostas.push(apostaSalva);
+    // --- Combinada BTTS + Mais de 1.5 gols (apenas se não houver conflito) ---
+    const pesoBTTS = 0.6;
+    const pesoMais15 = 0.4;
+    let probCombinada = (pesoBTTS * probBTTS) + (pesoMais15 * probMais15);
+
+    if (!(probBTTS > 0.9 && probMais15 > 0.9)) { // Evita conflito se ambos forem muito altos
+        const evCombinada = (probCombinada * ((oddEV + oddMais15) / 2)) - 1;
+        if (evCombinada > 0) {
+            apostas.push({ categoria: "Gols", tipo: 'Combinada BTTS + Mais de 1.5 gols', prob: probCombinada, ev: evCombinada });
+        }
+    }
+
+    // --- Filtrar apostas com EV positivo ---
+    let apostasValidas = apostas.filter(a => a.ev > 0);
+
+    // --- Destacar até duas apostas principais ---
+    let destaque = [];
+    if (apostasValidas.length > 0) {
+        apostasValidas.sort((a, b) => b.prob - a.prob);
+        destaque = apostasValidas.slice(0, 2);
+    }
+
+    // --- Marcar destaque ---
+    apostas = apostas.map(a => ({ ...a, destaque: destaque.some(d => d.tipo === a.tipo) }));
+
+    // --- Salvar histórico ---
+    destaque.forEach(a => {
+        const apostaSalva = { ...a, data: new Date().toLocaleString(), resultado: "" };
+        historicoApostas.push(apostaSalva);
+    });
     localStorage.setItem('historicoApostas', JSON.stringify(historicoApostas));
 
-    // Marcar a mais recomendada para destaque
-    return apostas.map(a => ({ ...a, destaque: a.tipo === recomendada.tipo }));
+    return apostas;
 }
+
 
 // --- Atualizar resultado manual ---
 function atualizarResultado(idx, valor) {
@@ -179,61 +230,67 @@ document.addEventListener('DOMContentLoaded', () => {
         );
 
         const probBTTS = calcularProbBTTS(gA, sA, gB, sB, cdA, cdB);
+        const probMais15 = probOverX(calcularMedia(gA), calcularMedia(gB), 1);
+        const probMais25 = probOverX(calcularMedia(gA), calcularMedia(gB), 2);
+        const probMenos35 = 1 - probMais25;
 
-        const mediaGolsA = calcularMedia(gA);
-        const mediaSofridosA = calcularMedia(sA);
-        const mediaGolsB = calcularMedia(gB);
-        const mediaSofridosB = calcularMedia(sB);
-
-        const lambdaA = (mediaGolsA + mediaSofridosB) / 2;
-        const lambdaB = (mediaGolsB + mediaSofridosA) / 2;
-
-        function factorial(n) { if (n === 0) return 1; let f = 1; for (let i = 1; i <= n; i++) f *= i; return f; }
-        function poisson(k, lambda) { return (Math.pow(lambda, k) * Math.exp(-lambda)) / factorial(k); }
-        function probOverX(lambdaA, lambdaB, x) {
-            let prob = 0;
-            for (let golsA = 0; golsA <= MAX_GOALS_POISSON; golsA++) {
-                for (let golsB = 0; golsB <= MAX_GOALS_POISSON; golsB++) {
-                    if (golsA + golsB > x) prob += poisson(golsA, lambdaA) * poisson(golsB, lambdaB);
-                }
-            }
-            return Math.min(Math.max(prob, 0), 1);
-        }
-
-        return {
-            probsOdds,
-            probBTTS,
-            probMais2_5: probOverX(lambdaA, lambdaB, 2),
-            probMais15: probOverX(lambdaA, lambdaB, 1.5),
-            probMenos35: 1 - probOverX(lambdaA, lambdaB, 3.5)
-        };
+        return { probsOdds, probBTTS, probMais2_5: probMais25, probMais15, probMenos35 };
     }
 
     function exibirResultado(prob) {
         const apostas = gerarSugestoesComDestaque(prob);
-        resultadoDiv.innerHTML = `<h3>Sugestões de Aposta</h3>` + apostas.map(a =>
-            `<div style="margin-bottom:5px;${a.destaque ? 'font-weight:bold; color:green;' : ''}">
-                ${a.tipo} | Prob: ${(a.prob * 100).toFixed(1)}% | EV: ${a.ev.toFixed(2)} ●
-            </div>`).join('');
 
-        // Atualizar histórico
+        if (!apostas.length) {
+            resultadoDiv.innerHTML = `<p style="color:red; font-weight:bold;">Nenhuma aposta confiável encontrada.</p>`;
+            return;
+        }
+
+        // Filtrar apenas as Dupla Chance válidas
+        const resultadosJogo = apostas.filter(a => ['Time A ou Empate', 'Time B ou Empate', 'Time A ou Time B'].includes(a.tipo));
+        const outrasApostas = apostas.filter(a => !['Time A ou Empate', 'Time B ou Empate', 'Time A ou Time B'].includes(a.tipo));
+
+        let html = `<h3 style="margin-bottom:10px;">Sugestões de Aposta</h3>`;
+
+        // Seção Probabilidades do Jogo
+        if (resultadosJogo.length) {
+            html += `<h4 style="margin:5px 0; color:#1e90ff;">Probabilidades do Jogo</h4>`;
+            resultadosJogo.forEach(a => {
+                html += `<div style="margin-bottom:5px; padding:4px 8px; border-radius:5px; background-color:#f0f8ff;">
+                        <strong>${a.tipo}:</strong> ${(a.prob * 100).toFixed(1)}%
+                     </div>`;
+            });
+        }
+
+        // Outras apostas (gols, escanteios, cartões)
+        if (outrasApostas.length) {
+            html += `<h4 style="margin:5px 0; color:#1e90ff;">Outras Apostas</h4>`;
+            outrasApostas.forEach(a => {
+                html += `<div style="margin-bottom:5px; padding:4px 8px; border-radius:5px; 
+                        ${a.destaque ? 'font-weight:bold; background-color:#d4edda; color:#155724;' : 'background-color:#f8f9fa; color:#333;'}">
+                        ${a.tipo} | Prob: ${(a.prob * 100).toFixed(1)}% | EV: ${a.ev.toFixed(2)}
+                     </div>`;
+            });
+        }
+
+        resultadoDiv.innerHTML = html;
         atualizarHistorico();
     }
 
-    function atualizarHistorico() {
-        if (!historicoDiv) return;
-        historicoDiv.innerHTML = `<h3>Histórico de Apostas</h3>` + historicoApostas.map((a, idx) =>
-            `<div style="margin-bottom:5px;">
-                ${idx + 1}. ${a.tipo} | Prob: ${(a.prob * 100).toFixed(1)}% | EV: ${a.ev.toFixed(2)} | ${a.data} 
-                | Resultado: 
-                <select onchange="atualizarResultado(${idx}, this.value)">
-                    <option value="" ${!a.resultado ? 'selected' : ''}>--</option>
-                    <option value="ganhou" ${a.resultado === 'ganhou' ? 'selected' : ''}>Ganhou</option>
-                    <option value="perdeu" ${a.resultado === 'perdeu' ? 'selected' : ''}>Perdeu</option>
-                </select>
-            </div>`).join('');
-    }
 
+    function atualizarHistorico() {
+        historicoDiv.innerHTML = '';
+        historicoApostas.slice(-10).forEach((a, idx) => {
+            const div = document.createElement('div');
+            div.style.margin = '2px 0';
+            div.innerHTML = `<strong>${a.tipo}</strong> | Prob: ${(a.prob * 100).toFixed(1)}% | EV: ${a.ev.toFixed(2)}
+                             <select onchange="atualizarResultado(${historicoApostas.length - 10 + idx}, this.value)">
+                                <option value="">---</option>
+                                <option value="Acertou">Acertou</option>
+                                <option value="Errou">Errou</option>
+                             </select>`;
+            historicoDiv.appendChild(div);
+        });
+    }
     form.addEventListener('submit', e => {
         e.preventDefault();
         const prob = calcularProbabilidades();
@@ -262,9 +319,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Exibir histórico ao carregar a página
     atualizarHistorico();
 });
+
+
+
+
+
 
 
 
